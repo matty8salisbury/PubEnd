@@ -61,13 +61,16 @@ shinyUI <- fluidPage(
           div(style="display: inline-block;vertical-align:top; width: 150px;",actionButton(inputId = 'delivered', label = 'Mark Order Delivered')),
           div(style="display: inline-block;vertical-align:top; width: 10px;",HTML("<br>")),
           div(style="display: inline-block;vertical-align:top; width: 150px;",actionButton(inputId = 'CollectComp', label = 'Close Order (at Payment)')),
-          
+          div(style="display: inline-block;vertical-align:top; width: 35px;",HTML("<br>")),
+          div(style="display: inline-block;vertical-align:top; width: 150px;",actionButton(inputId = 'cancel', label = 'Cancel Order')),
           div(style="display: clear"),
 
           div(style="margin-bottom:10px"),
 
 
-          helpText("The list of orders to the left will refresh each time an existing order is closed.  To refresh the list of orders without closing an order, click 'Refresh Orders' button.")
+          helpText("The list of orders to the left will refresh each time an existing order is closed or maked as delivered."),
+          helpText("To refresh the list of orders without closing an order, click 'Refresh Orders' button."),
+          helpText("If there are no existing orders, the table will refresh automatically every 10 seconds")
 
         )
       )
@@ -99,7 +102,7 @@ shinyUI <- fluidPage(
                   div(style="display: inline-block;vertical-align:top; width: 150px;",actionButton(inputId = 'refresh', label = 'Refresh View')),
  
  
-                  div(style="display: clear"),
+                  div(style="display:  clear"),
  
                   #1e insert button to refresh order list ----
                   helpText("The list of orders will refresh each time an existing order is closed.  To refresh the list of orders without closing an order, click 'Refresh View'")
@@ -112,7 +115,7 @@ shinyUI <- fluidPage(
 
 shinyServer <- function(input, output, session) {
 
-  #0. Set required inputs for connect
+  #0. Set required inputs for connect ----
   options(mysql = list(
     "host" = "database-2.c7cch80rsap5.eu-west-2.rds.amazonaws.com",
     "port" = 3306,
@@ -156,76 +159,85 @@ shinyServer <- function(input, output, session) {
     values$tbl_pub <- paste0(input$TestCentre, "Orders")
     values$viewByTable <- FALSE
   
-    #2. Define load data reactive function
+    #2. Define load data reactive function  ----
     
     #reactive function to establish connection to database
-    conn <- reactive({
+    conn <- function() {
       db <- "BAR"
       cn <- dbConnect(drv      = RMariaDB::MariaDB(),
                       username = options()$mysql$user,
                       password = options()$mysql$password,
                       host     = options()$mysql$host,
                       port     = options()$mysql$port,
-                      dbname = db
-      )
-    })
+                      dbname = db)
+      cn
+    }
     
     #reactive function to load function from database
-    loadDat <- reactive({
+    loadDat <- function() {
       cn <- conn()
-      query1 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE OrderStatus != 'Closed'", tbl = SQL(values$tbl_pub))
+      query1 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE OrderStatus NOT IN ('Closed', 'cancelled')", tbl = SQL(values$tbl_pub))
       dat <- dbGetQuery(cn, query1)
       dbDisconnect(cn)
       out <- dat
-    })
+      out
+    }
     
+    #function to update the display tables
+    fn_update_display <- function() {
+      
+      values$toDisplay <- values$open_orders_from_sql
+      
+      if(is.null(dim(values$toDisplay)[[1]]) | dim(values$toDisplay)[[1]] == 0) 
+      {summary_orders <- data.frame(OrderNumber = 0, Count = 0)} else {
+        summary_orders <- as.data.frame(table(values$toDisplay$OrderNumber))
+        names(summary_orders) <- c("OrderNumber", "Count")
+        summary_orders$OrderNumber <- as.numeric(as.character(summary_orders$OrderNumber))  
+      }
+      summary_orders
+    }
     
     values$open_orders_from_sql <- loadDat()
     
-    #3. Load data from sql
+    #3. Load data from sql  ----
     
     #3a. Load on startup or if order list is empty, every 15 seconds
     
     # Anything that calls autoInvalidate will automatically invalidate
     # every 10 seconds.
     autoInvalidate <- reactiveTimer(10000)
-    
     observeEvent(
       # Invalidate and re-execute this reactive expression every time the
       # timer fires.
       autoInvalidate(), {
-        if(is.null(dim(values$open_orders_from_sql))) {
-          values$open_orders_from_sql <- loadDat()
-        }
         values$num_orders <- dim(values$open_orders_from_sql)[[1]]
+        print(values$num_orders)
+        if(values$num_orders == 0 | is.null(values$num_orders)) {
+          values$open_orders_from_sql <- loadDat()
+          #update data table to select from
+          values$summary_orders <- fn_update_display()
+          output$DTtable <- DT::renderDataTable(rownames = FALSE, selection = 'single', options = list(paging = FALSE, searching = FALSE, bInfo = FALSE), isolate({
+            values$summary_orders
+          }))
+        }
       })
     
-    validate(need(dim(values$open_orders_from_sql)[[1]] > 0, message = "No Orders in App - Try Refreshing the Data"))
+    #validate(need(dim(values$open_orders_from_sql)[[1]] > 0, message = "No Orders in App - Try Refreshing the Data"))
     
-    #4. Create and Update the data table to select from
+    #4. Create and Update the data table to select from  ----
     
-    values$toDisplay <- values$open_orders_from_sql
-
-    #values$summary_orders <- group_by(values$toDisplay, OrderNumber) %>%
-    #  summarise(Count = n())
-
-    if(is.null(dim(values$toDisplay)[[1]]) | dim(values$toDisplay)[[1]] == 0) 
-    {values$summary_orders <- data.frame(OrderNumber = 0, Count = 0)} else {
-      values$summary_orders <- as.data.frame(table(values$toDisplay$OrderNumber))
-      names(values$summary_orders) <- c("OrderNumber", "Count")
-      values$summary_orders$OrderNumber <- as.numeric(as.character(values$summary_orders$OrderNumber))  
-    }
-    
+    values$summary_orders <- fn_update_display()
     output$DTtable <- DT::renderDataTable(rownames = FALSE, selection = 'single', options = list(paging = FALSE, searching = FALSE, bInfo = FALSE), isolate({
       values$summary_orders
     }))
+    
     #use proxy as a reactive value to trigger reload of data table on update of reactive elements  
     proxy = dataTableProxy('DTtable')
     observe({
       reloadData(proxy, values$summary_orders)
     })
       
-    #5. Create the detailed order table
+    #5. Create the detailed order table  ----
     
     # subset the records to the row that was clicked
     drilldata <- reactive({
@@ -246,129 +258,80 @@ shinyServer <- function(input, output, session) {
     output$drilldown <- DT::renderDataTable(drilldata(), rownames = FALSE, options = list(paging = FALSE, searching = FALSE, bInfo = FALSE))
     
     
-    #8. Mark rows from database for order delivered to customer and write back completed records
+    #6. Mark rows from database for order delivered to customer and write back completed records ----
     
     observeEvent(input$delivered, {
       
       #shiny::validate(need(input$BillType == "Order", "Error: App is in 'Viewing by Table' Mode so cannot mark individual orders."))
       
-      db <- "BAR"
-      cn <- dbConnect(drv      = RMariaDB::MariaDB(),
-                      username = options()$mysql$user,
-                      password = options()$mysql$password,
-                      host     = options()$mysql$host,
-                      port     = options()$mysql$port,
-                      dbname = db
-      )
-      
+      cn <- conn()
       query2 <- sqlInterpolate(cn, "UPDATE ?tbl SET OrderStatus = 'Delivered' WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
       close_order_from_sql <- dbGetQuery(cn, query2)
-      query3 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE OrderStatus != 'Closed'", tbl = SQL(values$tbl_pub))
-      values$open_orders_from_sql <- dbGetQuery(cn, query3)
-      
       dbDisconnect(cn)
+      values$open_orders_from_sql <- loadDat()
       
-      values$toDisplay <- values$open_orders_from_sql
-      #values$summary_orders <- group_by(values$toDisplay, OrderNumber) %>%
-      #  summarise(Count = n())
-      
-      if(is.null(dim(values$toDisplay)[[1]]) | dim(values$toDisplay)[[1]] == 0) 
-      {values$summary_orders <- data.frame(OrderNumber = 0, Count = 0)} else {
-        values$summary_orders <- as.data.frame(table(values$toDisplay$OrderNumber))
-        names(values$summary_orders) <- c("OrderNumber", "Count")
-        values$summary_orders$OrderNumber <- as.numeric(as.character(values$summary_orders$OrderNumber))  
-      }
-      
+      values$summary_orders <- fn_update_display()
       output$DTtable <- DT::renderDataTable(rownames = FALSE, selection = 'single', options = list(paging = FALSE, searching = FALSE, bInfo = FALSE), isolate({
         values$summary_orders
       }))
     })
     
-    #7. Delete rows from database for order completed and write back completed records
+    #7. Delete rows from database for order completed and write back completed records ----
     
     observeEvent(input$CollectComp, {
       
       #shiny::validate(need(input$BillType == "Order", "Error: App is in 'Billing by Table' Mode so cannot close individual orders."))
       
-      db <- "BAR"
-      cn <- dbConnect(drv      = RMariaDB::MariaDB(),
-                      username = options()$mysql$user,
-                      password = options()$mysql$password,
-                      host     = options()$mysql$host,
-                      port     = options()$mysql$port,
-                      dbname = db
-      )
-      
+      cn <- conn()
       query2 <- sqlInterpolate(cn, "UPDATE ?tbl SET OrderStatus = 'Closed' WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
       close_order_from_sql <- dbGetQuery(cn, query2)
-      query3 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE OrderStatus != 'Closed'", tbl = SQL(values$tbl_pub))
-      values$open_orders_from_sql <- dbGetQuery(cn, query3)
-      
       dbDisconnect(cn)
+      values$open_orders_from_sql <- loadDat()
       
-      values$toDisplay <- values$open_orders_from_sql
-      #values$summary_orders <- group_by(values$toDisplay, OrderNumber) %>%
-      #  summarise(Count = n())
-      
-      if(is.null(dim(values$toDisplay)[[1]]) | dim(values$toDisplay)[[1]] == 0) 
-      {values$summary_orders <- data.frame(OrderNumber = 0, Count = 0)} else {
-        values$summary_orders <- as.data.frame(table(values$toDisplay$OrderNumber))
-        names(values$summary_orders) <- c("OrderNumber", "Count")
-        values$summary_orders$OrderNumber <- as.numeric(as.character(values$summary_orders$OrderNumber))  
-      }
-      
+      values$summary_orders <- fn_update_display()
       output$DTtable <- DT::renderDataTable(rownames = FALSE, selection = 'single', options = list(paging = FALSE, searching = FALSE, bInfo = FALSE), isolate({
         values$summary_orders
       }))
       
     })
     
+    #8. Implement Cancel button action ----
     
-    #7. Refresh Orders from database
+    observeEvent(input$cancel, {
+      
+      #shiny::validate(need(input$BillType == "Order", "Error: App is in 'Billing by Table' Mode so cannot close individual orders."))
+      
+      cn <- conn()
+      query2 <- sqlInterpolate(cn, "UPDATE ?tbl SET OrderStatus = 'Cancelled' WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
+      close_order_from_sql <- dbGetQuery(cn, query2)
+      dbDisconnect(cn)
+      values$open_orders_from_sql <- loadDat()
+      
+      values$summary_orders <- fn_update_display()
+      output$DTtable <- DT::renderDataTable(rownames = FALSE, selection = 'single', options = list(paging = FALSE, searching = FALSE, bInfo = FALSE), isolate({
+        values$summary_orders
+      }))
+      
+    })
+    
+    #9. Refresh Orders from database ----
     
     observeEvent(input$refreshOrders, {
       
       #shiny::validate(need(input$BillType == "Order", "Error: App is in 'Billing by Table' Mode so cannot close individual orders."))
       
-      db <- "BAR"
-      cn <- dbConnect(drv      = RMariaDB::MariaDB(),
-                      username = options()$mysql$user,
-                      password = options()$mysql$password,
-                      host     = options()$mysql$host,
-                      port     = options()$mysql$port,
-                      dbname = db
-      )
-      
-      query3 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE OrderStatus != 'Closed'", tbl = SQL(values$tbl_pub))
-      values$open_orders_from_sql <- dbGetQuery(cn, query3)
-      
-      dbDisconnect(cn)
-      
-      values$toDisplay <- values$open_orders_from_sql
-      #values$summary_orders <- group_by(values$toDisplay, OrderNumber) %>%
-      #  summarise(Count = n())
-      
-      if(is.null(dim(values$toDisplay)[[1]]) | dim(values$toDisplay)[[1]] == 0) 
-      {values$summary_orders <- data.frame(OrderNumber = 0, Count = 0)} else {
-        values$summary_orders <- as.data.frame(table(values$toDisplay$OrderNumber))
-        names(values$summary_orders) <- c("OrderNumber", "Count")
-        values$summary_orders$OrderNumber <- as.numeric(as.character(values$summary_orders$OrderNumber))  
-      }
-      
+      values$open_orders_from_sql <- loadDat()
+
+      values$summary_orders <- fn_update_display()
       output$DTtable <- DT::renderDataTable(rownames = FALSE, selection = 'single', options = list(paging = FALSE, searching = FALSE, bInfo = FALSE), isolate({
         values$summary_orders
       }))
       
     })
     
-    
-    
-    #7. Switch to table view
+    #10. Switch to table view ----
       
     tableList <- unique(values$open_orders_from_sql$TableNumber)
-
-    
-
 
     observeEvent(input$viewByTable, {
 
@@ -385,19 +348,7 @@ shinyServer <- function(input, output, session) {
 
     observeEvent(input$tableDetail, {
       
-      db <- "BAR"
-      cn <- dbConnect(drv      = RMariaDB::MariaDB(),
-                      username = options()$mysql$user,
-                      password = options()$mysql$password,
-                      host     = options()$mysql$host,
-                      port     = options()$mysql$port,
-                      dbname = db
-      )
-      
-      query3 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE OrderStatus != 'Closed'", tbl = SQL(values$tbl_pub))
-      values$open_orders_from_sql <- dbGetQuery(cn, query3)
-      
-      dbDisconnect(cn)
+      values$open_orders_from_sql <- loadDat()
       
       if(input$SelectedTab %in% unique(as.numeric(values$open_orders_from_sql$TableNumber))) {
         
@@ -421,27 +372,17 @@ shinyServer <- function(input, output, session) {
       
     })
     
-    #7. Delete rows from database for order completed and write back completed records
+    #11. Delete rows from database for order completed and write back completed records - table view ----
     
     observeEvent(input$CloseTableTab, {
       
       #shiny::validate(need(input$BillType == "Order", "Error: App is in 'Billing by Table' Mode so cannot close individual orders."))
       
-      db <- "BAR"
-      cn <- dbConnect(drv      = RMariaDB::MariaDB(),
-                      username = options()$mysql$user,
-                      password = options()$mysql$password,
-                      host     = options()$mysql$host,
-                      port     = options()$mysql$port,
-                      dbname = db
-      )
-      
+      cn <- conn()
       query4 <- sqlInterpolate(cn, "UPDATE ?tbl SET OrderStatus = 'Closed' WHERE TableNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(input$SelectedTab))
       close_table_from_sql <- dbGetQuery(cn, query4)
-      query5 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE OrderStatus != 'Closed'", tbl = SQL(values$tbl_pub))
-      values$open_orders_from_sql <- dbGetQuery(cn, query5)
-      
       dbDisconnect(cn)
+      values$open_orders_from_sql <- loadDat()
       
       showTab(inputId = "inTabset", target = "panel2")
       updateTabsetPanel(session, "inTabset",
@@ -467,25 +408,13 @@ shinyServer <- function(input, output, session) {
     })
     
     
-    #7. Refresh Orders from database
+    #12. Refresh Orders from database - table view ----
     
     observeEvent(input$refresh, {
       
       #shiny::validate(need(input$BillType == "Order", "Error: App is in 'Billing by Table' Mode so cannot close individual orders."))
       
-      db <- "BAR"
-      cn <- dbConnect(drv      = RMariaDB::MariaDB(),
-                      username = options()$mysql$user,
-                      password = options()$mysql$password,
-                      host     = options()$mysql$host,
-                      port     = options()$mysql$port,
-                      dbname = db
-      )
-      
-      query6 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE OrderStatus != 'Closed'", tbl = SQL(values$tbl_pub))
-      values$open_orders_from_sql <- dbGetQuery(cn, query6)
-      
-      dbDisconnect(cn)
+      values$open_orders_from_sql <- loadDat()
       
       showTab(inputId = "inTabset", target = "panel2")
       updateTabsetPanel(session, "inTabset",
@@ -511,36 +440,6 @@ shinyServer <- function(input, output, session) {
     })
 
 
-
-
-
-
-    
-    
-    
-    
-    
-    
-    
-    # observeEvent(input$DTtable_rows_selected, {
-    #   
-    #   shinyalert(
-    #     text = "Mark Selected Item as Delivered?",
-    #     showCancelButton = TRUE,
-    #     callbackR = function(x) { if(x != FALSE) {
-    #       values$df = values$df[-c(input$OrderTable_rows_selected, dim(values$df)[[1]]),]
-    #       values$df[dim(values$df)[[1]] + 1,] <- c("Total", sum(as.numeric(values$df[,2])), sum(as.numeric(values$df[,2])*as.numeric(values$df[,3])), values$TestCentre, input$TableNumber, values$OrderNum, "", "Open")
-    #     }
-    #     }, 
-    #     inputId = "shinyalert"
-    #   )
-    # })
-    
-
-
-
-    
-    
   })
 } 
 
