@@ -135,7 +135,7 @@ shinyServer <- function(input, output, session) {
   pubList <- as.list(read.csv(file = "test_centre_list.csv", header = T))
   
   output$SelectedPub <- renderUI({selectInput(inputId = 'TestCentre',
-                                                     label = 'Pub',
+                                                     label = 'Venue',
                                                      choices = pubList)})
   
   
