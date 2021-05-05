@@ -159,9 +159,9 @@ shinyServer <- function(input, output, session) {
     values$tbl_pub <- paste0(input$TestCentre, "Orders")
     values$viewByTable <- FALSE
   
-    #2. Define load data reactive function  ----
+    #2. Define connection and load data reactive function and prep database on first use ----
     
-    #reactive function to establish connection to database
+    #function to establish connection to database
     conn <- function() {
       db <- "BAR"
       cn <- dbConnect(drv      = RMariaDB::MariaDB(),
@@ -173,7 +173,7 @@ shinyServer <- function(input, output, session) {
       cn
     }
     
-    #reactive function to load function from database
+    #function to load function from database
     loadDat <- function() {
       cn <- conn()
       query1 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE OrderStatus NOT IN ('Closed', 'cancelled')", tbl = SQL(values$tbl_pub))
@@ -197,11 +197,68 @@ shinyServer <- function(input, output, session) {
       summary_orders
     }
     
-    values$open_orders_from_sql <- loadDat()
+    #test if database exists
+    cn <- conn()
+    query1 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE OrderStatus NOT IN ('Closed', 'cancelled')", tbl = SQL(values$tbl_pub))
+    mtry <- try(dbGetQuery(cn, query1))
+    
+    #if not create it
+    if (length(grep("doesn't exist", mtry)) > 0) {
+      a <- input$TestCentre
+      Records <- data.frame(
+        row_names = "", OrderName = "", OrderEmail = "", OrderTimeIn = "", OrderIntPhone = 0, OrderPhone = 0, OrderNumber = 0, OrderQrRef = "", OrderTimeOut = ""
+        , stringsAsFactors = FALSE)
+      
+      RecordstblName <- paste0(a, "Records")  
+      #create archive orders tables by renaming live tables
+      #dbGetQuery(cn, paste0("RENAME TABLE `",RecordstblName, "` TO ", paste0("`",RecordstblName, "Archive", gm_date(),"`")))
+      #create new live orders table
+      DBI::dbWriteTable(cn, name = RecordstblName, value = Records, overwrite = TRUE, field.types = c(
+        row_names = "varchar(50)", OrderName = "varchar(50)", OrderEmail = "varchar(50)", OrderTimeIn = "varchar(50)", OrderIntPhone = "double", OrderPhone = "double", OrderNumber = "double", OrderQrRef = "varchar(50)", OrderTimeOut = "varchar(50)"
+      ))
+      
+      Orders <- data.frame(
+        row_names = "", Item = "", Number = 0, Price = 0, Pub = "", TableNumber = 0, OrderNumber = 0, OrderQrRef = "", OrderStatus = "Closed"
+        , stringsAsFactors = FALSE)
+      OrderstblName <- paste0(a, "Orders")
+      #create new live orders table
+      DBI::dbWriteTable(cn, name = OrderstblName, value = Orders, overwrite = TRUE, field.types = c(
+        row_names = "varchar(50)", Item = "varchar(50)", Number = "double", Price = "double", Pub = "varchar(50)", TableNumber = "double", OrderNumber = "double", OrderQrRef = "varchar(50)", OrderStatus = "varchar(50)"
+      ))
+      #create closed (& cancelled) orders table
+      DBI::dbWriteTable(cn, name = paste0("Closed",OrderstblName), value = Orders, overwrite = TRUE, field.types = c(
+        row_names = "varchar(50)", Item = "varchar(50)", Number = "double", Price = "double", Pub = "varchar(50)", TableNumber = "double", OrderNumber = "double", OrderQrRef = "varchar(50)", OrderStatus = "varchar(50)"
+      ))
+    }
+    
+    #Auto delete personal data more than two weeks old - do this on start up or if app is left on, once every 24hrs
+    #at start up
+    #cn <- conn()
+    query2 <- sqlInterpolate(cn, "DELETE FROM ?tbl WHERE (DATEDIFF(CAST(NOW() AS DATE), CAST(OrderTimeIn AS DATE)) > 13)", tbl = SQL(paste0(input$TestCentre, "Records")))
+    rs <- dbSendStatement(cn, query2)
+    dbClearResult(rs)
+    dbDisconnect(cn)
+    
+    #if left on, then every 24 hours
+    # Anything that calls autoInvalidateDaily will automatically invalidate every day.
+    autoInvalidateDaily <- reactiveTimer(60*60*24*1000)
+    observeEvent(
+      # Invalidate and re-execute this reactive expression every time the
+      # timer fires.
+      autoInvalidateDaily(), {
+        cn <- conn()
+        query2 <- sqlInterpolate(cn, "DELETE FROM ?tbl WHERE (DATEDIFF(CAST(NOW() AS DATE), CAST(OrderTimeIn AS DATE)) > 13)", tbl = SQL(paste0(input$TestCentre, "Records")))
+        rs <- dbSendStatement(cn, query2)
+        dbClearResult(rs)
+        dbDisconnect(cn)
+      })
     
     #3. Load data from sql  ----
     
     #3a. Load on startup or if order list is empty, every 15 seconds
+    
+    #download open orders from database
+    values$open_orders_from_sql <- loadDat()
     
     # Anything that calls autoInvalidate will automatically invalidate
     # every 10 seconds.
@@ -211,7 +268,6 @@ shinyServer <- function(input, output, session) {
       # timer fires.
       autoInvalidate(), {
         values$num_orders <- dim(values$open_orders_from_sql)[[1]]
-        print(values$num_orders)
         if(values$num_orders == 0 | is.null(values$num_orders)) {
           values$open_orders_from_sql <- loadDat()
           #update data table to select from
@@ -283,8 +339,12 @@ shinyServer <- function(input, output, session) {
       #shiny::validate(need(input$BillType == "Order", "Error: App is in 'Billing by Table' Mode so cannot close individual orders."))
       
       cn <- conn()
-      query2 <- sqlInterpolate(cn, "UPDATE ?tbl SET OrderStatus = 'Closed' WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
-      close_order_from_sql <- dbGetQuery(cn, query2)
+      query1 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
+      values$close_order_from_sql <- dbGetQuery(cn, query1)
+      query2 <- sqlInterpolate(cn, "DELETE FROM ?tbl WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
+      del_close_order <- dbSendStatement(cn, query2)
+      dbClearResult(del_close_order)
+      dbWriteTable(cn, name = paste0("Closed", values$tbl_pub), value = values$close_order_from_sql, append = TRUE)
       dbDisconnect(cn)
       values$open_orders_from_sql <- loadDat()
       
@@ -302,8 +362,15 @@ shinyServer <- function(input, output, session) {
       #shiny::validate(need(input$BillType == "Order", "Error: App is in 'Billing by Table' Mode so cannot close individual orders."))
       
       cn <- conn()
-      query2 <- sqlInterpolate(cn, "UPDATE ?tbl SET OrderStatus = 'Cancelled' WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
-      close_order_from_sql <- dbGetQuery(cn, query2)
+      query1 <- sqlInterpolate(cn, "UPDATE ?tbl SET OrderStatus = 'Cancelled' WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
+      cancel_order_from_sql <- dbSendStatement(cn, query1)
+      dbClearResult(cancel_order_from_sql)
+      query2 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
+      values$close_order_from_sql <- dbGetQuery(cn, query2)
+      query3 <- sqlInterpolate(cn, "DELETE FROM ?tbl WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
+      del_close_order <- dbSendStatement(cn, query3)
+      dbClearResult(del_close_order)
+      dbWriteTable(cn, name = paste0("Closed", values$tbl_pub), value = values$close_order_from_sql, append = TRUE)
       dbDisconnect(cn)
       values$open_orders_from_sql <- loadDat()
       
@@ -379,8 +446,16 @@ shinyServer <- function(input, output, session) {
       #shiny::validate(need(input$BillType == "Order", "Error: App is in 'Billing by Table' Mode so cannot close individual orders."))
       
       cn <- conn()
-      query4 <- sqlInterpolate(cn, "UPDATE ?tbl SET OrderStatus = 'Closed' WHERE TableNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(input$SelectedTab))
-      close_table_from_sql <- dbGetQuery(cn, query4)
+      #query4 <- sqlInterpolate(cn, "UPDATE ?tbl SET OrderStatus = 'Closed' WHERE TableNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(input$SelectedTab))
+      #update_cancellations <- dbSendStatement(cn, query4)
+      #dbClearResult(update_cancellations)
+      query2 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE TableNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(input$SelectedTab))
+      values$tbl_close <- dbGetQuery(cn, query2)
+      query3 <- sqlInterpolate(cn, "DELETE FROM ?tbl WHERE TableNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(input$SelectedTab))
+      del_close_order <- dbSendStatement(cn, query3)
+      dbClearResult(del_close_order)
+      dbWriteTable(cn, name = paste0("Closed", values$tbl_pub), value = values$tbl_close, append = TRUE)
+      
       dbDisconnect(cn)
       values$open_orders_from_sql <- loadDat()
       
