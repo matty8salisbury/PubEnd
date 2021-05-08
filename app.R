@@ -117,8 +117,8 @@ shinyServer <- function(input, output, session) {
 
   #0. Set required inputs for connect ----
   options(mysql = list(
-    "host" = "database-2.c7cch80rsap5.eu-west-2.rds.amazonaws.com",
-    "port" = 3306,
+    "host" = Sys.getenv("SQL_ENDPOINT"),
+    "port" = Sys.getenv("SQL_PORT"),
     "user" = Sys.getenv("MY_UID"),
     "password" = Sys.getenv("MY_PWD")
   ))
@@ -132,7 +132,7 @@ shinyServer <- function(input, output, session) {
   #set working drive to be working drive for app
   #setwd("/home/rstudio/ShinyApps/Order")
   
-  pubList <- as.list(read.csv(file = "test_centre_list.csv", header = T))
+  pubList <- as.list(rbind(read.csv(file = "test_centre_list.csv", header = T), venue))
   
   output$SelectedPub <- renderUI({selectInput(inputId = 'TestCentre',
                                                      label = 'Venue',
@@ -143,11 +143,11 @@ shinyServer <- function(input, output, session) {
 
     if(input$login > 3) {Sys.sleep(10*input$login - 30)}
     output$passCheck <- renderText({
-      validate(need(input$PsWd == Sys.getenv(paste0(input$TestCentre, "PsWd")), message = "Error: incorrect password"))
+      validate(need(input$PsWd == Sys.getenv("VenuePsWd"), message = "Error: incorrect password"))
       ""
     })
     
-    validate(need(input$PsWd == Sys.getenv(paste0(input$TestCentre, "PsWd")), message = "Error: incorrect password"))
+    validate(need(input$PsWd == Sys.getenv("VenuePsWd"), message = "Error: incorrect password"))
     
     showTab(inputId = "inTabset", target = "panel2")
     updateTabsetPanel(session, "inTabset",
@@ -162,23 +162,24 @@ shinyServer <- function(input, output, session) {
     #2. Define connection and load data reactive function and prep database on first use ----
     
     #function to establish connection to database
-    conn <- function() {
-      db <- "BAR"
+    db_to_use <- "BAR"
+    conn <- function(db = db_to_use) {
       cn <- dbConnect(drv      = RMariaDB::MariaDB(),
                       username = options()$mysql$user,
                       password = options()$mysql$password,
                       host     = options()$mysql$host,
                       port     = options()$mysql$port,
-                      dbname = db)
+                      dbname = db
+                      )
       cn
     }
     
     #function to load function from database
     loadDat <- function() {
-      cn <- conn()
-      query1 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE OrderStatus NOT IN ('Closed', 'cancelled')", tbl = SQL(values$tbl_pub))
-      dat <- dbGetQuery(cn, query1)
-      dbDisconnect(cn)
+      con <- conn()
+      query1 <- sqlInterpolate(con, "SELECT * FROM ?tbl WHERE OrderStatus NOT IN ('Closed', 'cancelled')", tbl = SQL(values$tbl_pub))
+      dat <- dbGetQuery(con, query1)
+      dbDisconnect(con)
       out <- dat
       out
     }
@@ -198,12 +199,19 @@ shinyServer <- function(input, output, session) {
     }
     
     #test if database exists
-    cn <- conn()
-    query1 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE OrderStatus NOT IN ('Closed', 'cancelled')", tbl = SQL(values$tbl_pub))
-    mtry <- try(dbGetQuery(cn, query1))
+    mtry <- try(dbGetQuery(conn(), sqlInterpolate(conn(), "SELECT * FROM ?tbl WHERE OrderStatus NOT IN ('Closed', 'cancelled')", tbl = SQL(values$tbl_pub))))
+    if(class(mtry) == "data.frame") {dbDisconnect(conn())}
     
     #if not create it
-    if (length(grep("doesn't exist", mtry)) > 0) {
+    if (length(grep("Error", mtry)) > 0) {
+      if (length(grep("Failed to connect", mtry)) > 0) {
+        cn <- conn(db = "")
+        query1 <- sqlInterpolate(cn, "CREATE DATABASE ?db_to_create", db_to_create = SQL(db_to_use))
+        cr_db <- dbSendStatement(cn, query1)
+        dbDisconnect(cn)
+      }
+      
+      cn <- conn()
       a <- input$TestCentre
       Records <- data.frame(
         row_names = "", OrderName = "", OrderEmail = "", OrderTimeIn = "", OrderIntPhone = 0, OrderPhone = 0, OrderNumber = 0, OrderQrRef = "", OrderTimeOut = ""
@@ -229,11 +237,12 @@ shinyServer <- function(input, output, session) {
       DBI::dbWriteTable(cn, name = paste0("Closed",OrderstblName), value = Orders, overwrite = TRUE, field.types = c(
         row_names = "varchar(50)", Item = "varchar(50)", Number = "double", Price = "double", Pub = "varchar(50)", TableNumber = "double", OrderNumber = "double", OrderQrRef = "varchar(50)", OrderStatus = "varchar(50)"
       ))
+      dbDisconnect(cn)
     }
     
     #Auto delete personal data more than two weeks old - do this on start up or if app is left on, once every 24hrs
     #at start up
-    #cn <- conn()
+    cn <- conn()
     query2 <- sqlInterpolate(cn, "DELETE FROM ?tbl WHERE (DATEDIFF(CAST(NOW() AS DATE), CAST(OrderTimeIn AS DATE)) > 13)", tbl = SQL(paste0(input$TestCentre, "Records")))
     rs <- dbSendStatement(cn, query2)
     dbClearResult(rs)
@@ -255,7 +264,7 @@ shinyServer <- function(input, output, session) {
     
     #3. Load data from sql  ----
     
-    #3a. Load on startup or if order list is empty, every 15 seconds
+    #3a. Load on startup or if order list is empty, every 10 seconds
     
     #download open orders from database
     values$open_orders_from_sql <- loadDat()
