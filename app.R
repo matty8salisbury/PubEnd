@@ -208,6 +208,7 @@ shinyServer <- function(input, output, session) {
         cn <- conn(db = "")
         query1 <- sqlInterpolate(cn, "CREATE DATABASE ?db_to_create", db_to_create = SQL(db_to_use))
         cr_db <- dbSendStatement(cn, query1)
+        dbClearResult(cr_db)
         dbDisconnect(cn)
       }
       
