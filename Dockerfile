@@ -14,5 +14,5 @@ COPY PubEnd/Rprofile.site usr/local/lib/R/etc/
 
 EXPOSE 3838
 
-CMD ["R", "-e", "source('/root/PubEnd/venueinfo.R'); print(Sys.getenv('SQL_ENDPOINT'); shiny::runApp('/root/PubEnd')"]
-#CMD ["R", "-e", "source('/root/PubEnd/venueinfo.R'); print(Sys.getenv('SQL_ENDPOINT'); shiny::runApp('/root/CheckClosedOrders')"]
+CMD ["R", "-e", "source('/root/PubEnd/venueinfo.R'); print(Sys.getenv('SQL_ENDPOINT')); shiny::runApp('/root/PubEnd')"]
+#CMD ["R", "-e", "source('/root/PubEnd/venueinfo.R'); print(Sys.getenv('SQL_ENDPOINT')); shiny::runApp('/root/CheckClosedOrders')"]
