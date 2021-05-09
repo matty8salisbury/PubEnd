@@ -10,9 +10,8 @@ RUN mkdir /root/PubEnd
 COPY PubEnd /root/PubEnd
 RUN mkdir /root/CheckClosedOrders
 COPY CheckClosedOrders /root/CheckClosedOrders
-COPY venueinfo.R /root/venueinfo.R
 
 EXPOSE 3838
 
-CMD ["R", "-e", "source('/root/venueinfo.R'); shiny::runApp('/root/PubEnd')"]
-CMD ["R", "-e", "source('/root/venueinfo.R'); shiny::runApp('/root/CheckClosedOrders')"]
+CMD ["R", "-e", "source('/root/PubEnd/venueinfo.R'); shiny::runApp('/root/PubEnd')"]
+CMD ["R", "-e", "source('/root/PubEnd/venueinfo.R'); shiny::runApp('/root/CheckClosedOrders')"]
