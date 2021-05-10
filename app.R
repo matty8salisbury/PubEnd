@@ -282,10 +282,10 @@ shinyServer <- function(input, output, session) {
       dbDisconnect(cn)
     }
     
-    #Auto delete personal data more than two weeks old - do this on start up or if app is left on, once every 24hrs
+    #Auto delete personal data more than three weeks old - do this on start up or if app is left on, once every 24hrs
     #at start up
     cn <- conn()
-    query2 <- sqlInterpolate(cn, "DELETE FROM ?tbl WHERE (DATEDIFF(CAST(NOW() AS DATE), CAST(OrderTimeIn AS DATE)) > 13)", tbl = SQL(paste0(input$TestCentre, "Records")))
+    query2 <- sqlInterpolate(cn, "DELETE FROM ?tbl WHERE (DATEDIFF(CAST(NOW() AS DATE), CAST(OrderTimeIn AS DATE)) > 21)", tbl = SQL(paste0(input$TestCentre, "Records")))
     rs <- dbSendStatement(cn, query2)
     dbClearResult(rs)
     dbDisconnect(cn)
@@ -298,7 +298,7 @@ shinyServer <- function(input, output, session) {
       # timer fires.
       autoInvalidateDaily(), {
         cn <- conn()
-        query2 <- sqlInterpolate(cn, "DELETE FROM ?tbl WHERE (DATEDIFF(CAST(NOW() AS DATE), CAST(OrderTimeIn AS DATE)) > 13)", tbl = SQL(paste0(input$TestCentre, "Records")))
+        query2 <- sqlInterpolate(cn, "DELETE FROM ?tbl WHERE (DATEDIFF(CAST(NOW() AS DATE), CAST(OrderTimeIn AS DATE)) > 21)", tbl = SQL(paste0(input$TestCentre, "Records")))
         rs <- dbSendStatement(cn, query2)
         dbClearResult(rs)
         dbDisconnect(cn)
