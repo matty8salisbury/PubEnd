@@ -109,6 +109,44 @@ shinyUI <- fluidPage(
  
                )
              )
+          ),
+    tabPanel(title = "View Closed Orders", value = "panel4",
+             sidebarLayout(
+               sidebarPanel(
+                 
+                 #1b display summary of orders available to drill into ----
+                 tags$h2("Closed Orders"),
+                 dataTableOutput("summaryClosed")
+                 
+                 #data file
+                 #fileInput(inputId = "file", label = "Upload Pricelist (csv file)"),
+                 #helpText("max file size is 60MB")
+               ),
+               mainPanel(
+                 #tabsetPanel(id = "inTabset",
+                 #           tabPanel(title = "Order_Detail", value = "panel1",
+                 titlePanel("Selected Closed Order Detail"),
+                 
+                 #1c Display Drilldown Data - i.e. details of selected order ----
+                 dataTableOutput("drilldownClosed"),
+                 
+                 # #1d insert button to close the order ----
+                 # actionButton(inputId = 'CollectComp', label = 'Close Order'),
+                 # div(style="margin-bottom:10px"),
+                 
+                 #1e insert button to refresh order list ----
+                 #helpText("The list of orders to the left will refresh each time an existing order is closed.  To refresh the list of orders without closing an order, click below"),
+                 actionButton(inputId = 'refreshOrdersClosed', label = 'Refresh Closed Order List'),
+                 
+                 tags$h2("Download Closed Orders"),
+                 helpText("Select Date Range for Download of all Closed Orders"),
+                 helpText("NB: if possible avoid doing downloads while customers are actively using the Customer App"),
+                 dateInput(inputId = 'dateFrom', label = 'Date From'),
+                 dateInput(inputId = 'dateTo', label = 'Date To'),
+                 
+                 downloadButton("downloadData", "Download")
+               )
+             )
           )
   )
 )
@@ -127,6 +165,7 @@ shinyServer <- function(input, output, session) {
   
   hideTab(inputId = "inTabset", target = "panel2")
   hideTab(inputId = "inTabset", target = "panel3")
+  hideTab(inputId = "inTabset", target = "panel4")
   values <- reactiveValues()
 
   #set working drive to be working drive for app
@@ -152,7 +191,7 @@ shinyServer <- function(input, output, session) {
     showTab(inputId = "inTabset", target = "panel2")
     updateTabsetPanel(session, "inTabset",
                       selected = "panel2")
-    
+    showTab(inputId = "inTabset", target = "panel4")
     hideTab(inputId = "inTabset", target = "panel1")
     
     values$num_orders <- 0
@@ -212,7 +251,6 @@ shinyServer <- function(input, output, session) {
         dbDisconnect(cn)
       }
       
-      cn <- conn()
       a <- input$TestCentre
       Records <- data.frame(
         row_names = "", OrderName = "", OrderEmail = "", OrderTimeIn = "", OrderIntPhone = 0, OrderPhone = 0, OrderNumber = 0, OrderQrRef = "", OrderTimeOut = ""
@@ -222,15 +260,18 @@ shinyServer <- function(input, output, session) {
       #create archive orders tables by renaming live tables
       #dbGetQuery(cn, paste0("RENAME TABLE `",RecordstblName, "` TO ", paste0("`",RecordstblName, "Archive", gm_date(),"`")))
       #create new live orders table
+      cn <- conn()
       DBI::dbWriteTable(cn, name = RecordstblName, value = Records, overwrite = TRUE, field.types = c(
         row_names = "varchar(50)", OrderName = "varchar(50)", OrderEmail = "varchar(50)", OrderTimeIn = "varchar(50)", OrderIntPhone = "double", OrderPhone = "double", OrderNumber = "double", OrderQrRef = "varchar(50)", OrderTimeOut = "varchar(50)"
       ))
+      dbDisconnect(cn)
       
       Orders <- data.frame(
         row_names = "", Item = "", Number = 0, Price = 0, Pub = "", TableNumber = 0, OrderNumber = 0, OrderQrRef = "", OrderStatus = "Closed"
         , stringsAsFactors = FALSE)
       OrderstblName <- paste0(a, "Orders")
       #create new live orders table
+      cn <- conn()
       DBI::dbWriteTable(cn, name = OrderstblName, value = Orders, overwrite = TRUE, field.types = c(
         row_names = "varchar(50)", Item = "varchar(50)", Number = "double", Price = "double", Pub = "varchar(50)", TableNumber = "double", OrderNumber = "double", OrderQrRef = "varchar(50)", OrderStatus = "varchar(50)"
       ))
@@ -523,8 +564,134 @@ shinyServer <- function(input, output, session) {
       }))
       
     })
+    
+    
+    #3. INITIAL SET UP UP - PULL IN DATA FROM SQL FOR OPEN ORDERS AND DISPLAY SUMMARY OF ORDERS TO DRILL DOWN ----
+    if(input$refreshOrdersClosed == 0){
+      #2. Bring in table of open orders from sql database
+      
+      options(mysql = list(
+        "host" = Sys.getenv("SQL_ENDPOINT"),
+        "port" = Sys.getenv("SQL_PORT"),
+        "user" = Sys.getenv("MY_UID"),
+        "password" = Sys.getenv("MY_PWD")
+      ))
+      
+      values$tbl_pubClosed <- paste0("Closed", input$TestCentre, "Orders")
+      
+      values$db <- "BAR"
+      cn <- dbConnect(drv      = RMariaDB::MariaDB(),
+                      username = options()$mysql$user,
+                      password = options()$mysql$password,
+                      host     = options()$mysql$host,
+                      port     = options()$mysql$port,
+                      dbname = values$db
+      )
+      
+      values$query <- sqlInterpolate(cn, "SELECT * FROM ?tbl", tbl = SQL(values$tbl_pubClosed))
+      values$closed_orders_from_sql <- dbGetQuery(cn, values$query)
+      dbDisconnect(cn)
+      values$toDisplayClosed <- values$closed_orders_from_sql
+      
+      #cons<-DBI::dbListConnections(RMariaDB::MariaDB())
+      #for(con in cons) dbDisconnect(con)
+      
+      # summarise table
+      
+      #values$summary_orders <- group_by(values$toDisplay, OrderNumber) %>%
+      #  summarise(Count = n())
+      
+      if(is.null(dim(values$toDisplayClosed)[[1]])) 
+      {values$summary_ordersClosed <- data.frame(OrderNumber = 0, Count = 0)} else {
+        values$summary_ordersClosed <- as.data.frame(table(values$toDisplayClosed$OrderNumber))
+        names(values$summary_ordersClosed) <- c("OrderNumber", "Count")
+        values$summary_ordersClosed$OrderNumber <- as.numeric(as.character(values$summary_ordersClosed$OrderNumber))  
+      }
+      
+      # display the data that is available to be drilled down
+      output$summaryClosed <- DT::renderDataTable(values$summary_ordersClosed[,-3], selection = 'single', rownames = FALSE)  
+      
+      values$num_ordersClosed <- dim(values$closed_orders_from_sql)[[1]]
+    }
+    
+    
+    #5. CREATE DRILL DOWN TABLE ----
+    
+    # subset the records to the row that was clicked
+    drilldataClosed <- reactive({
+      shiny::validate(
+        need(length(input$summaryClosed_rows_selected) > 0, "")
+      )    
+      
+      # subset the summary table and extract the column to subset on
+      # if you have more than one column, consider a merge instead
+      # NOTE: the selected row indices will be character type so they
+      #   must be converted to numeric or integer before subsetting
+      values$selectedOrderClosed <- values$summary_ordersClosed[as.integer(input$summaryClosed_rows_selected), ]$OrderNumber
+      
+      #values$closed_orders_from_sql[values$closed_orders_from_sql$OrderNumber %in% input$summary_rows_selected, ]
+      values$closed_orders_from_sql[values$closed_orders_from_sql$OrderNumber %in% values$selectedOrderClosed, ]
+      
+    })
+    
+    # display the subsetted data
+    output$drilldownClosed <- DT::renderDataTable(drilldataClosed(), rownames = FALSE)
+    
+    
+    #7. build 'refresh orders list' button
+    
+    observeEvent(input$refreshOrdersClosed, {
+      
+      values$db <- "BAR"
+      cn <- dbConnect(drv      = RMariaDB::MariaDB(),
+                      username = options()$mysql$user,
+                      password = options()$mysql$password,
+                      host     = options()$mysql$host,
+                      port     = options()$mysql$port,
+                      dbname = values$db
+      )
+      
+      values$query4 <- sqlInterpolate(cn, "SELECT * FROM ?tbl", tbl = SQL(values$tbl_pubClosed))
+      values$toDisplayClosed <- dbGetQuery(cn, values$query4)
+      dbDisconnect(cn)
+      
+      # summarise table
+      
+      #values$summary_orders <- group_by(values$toDisplay, OrderNumber) %>%
+      #  summarise(Count = n())
+      
+      if(is.null(dim(values$toDisplayClosed)[[1]])) 
+      {values$summary_ordersClosed <- data.frame(OrderNumber = 0, Count = 0)} else {
+        values$summary_ordersClosed <- as.data.frame(table(values$toDisplayClosed$OrderNumber))
+        names(values$summary_ordersClosed) <- c("OrderNumber", "Count")
+        values$summary_ordersClosed$OrderNumber <- as.numeric(as.character(values$summary_ordersClosed$OrderNumber))  
+      }
+      
+      # display the data that is available to be drilled down
+      output$summaryClosed <- DT::renderDataTable(values$summary_ordersClosed, selection = 'single', rownames = FALSE)
+      
+      values$num_ordersClosed <- dim(values$closed_orders_from_sql)[[1]]
 
-
+    })
+    
+    output$downloadData <- downloadHandler(
+      filename = function() {
+        paste("ClosedOrderDownload", Sys.Date(), ".csv", sep="")
+      },
+      content = function(file) {
+        start_char <- nchar(venue) + 1
+        end_char <- nchar(venue) + 10
+        write.csv(
+          values$toDisplayClosed[(as.Date(substring(values$toDisplayClosed$OrderQrRef, start_char, end_char)) >= input$dateFrom) & (as.Date(substring(values$toDisplayClosed$OrderQrRef, start_char, end_char)) <= input$dateTo),]
+          , row.names = FALSE
+          , file)
+      }
+    )
+    
+    #observeEvent(input$downloadClosed, {
+    #xpTable <- values$toDisplayClosed[(as.Date(substring(values$toDisplay$QrRef, start_char, end_char)) >= input$dateFrom) & (as.Date(substring(values$toDisplay$QrRef, start_char, end_char)) <= input$dateTo),]
+    #print(xpTable)
+    
   })
 } 
 
