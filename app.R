@@ -55,6 +55,8 @@ shinyUI <- fluidPage(
           textOutput("Detail of Order Selected"),
           dataTableOutput("drilldown"),
           div(style="margin-bottom:10px"),
+          
+          useShinyalert(rmd = FALSE),
 
           #1d insert button to close the order and  --------
 
@@ -94,6 +96,8 @@ shinyUI <- fluidPage(
                  textOutput("Detail of Orders for Selected Table"),
                  dataTableOutput("DTviewByTable"),
                  div(style="margin-bottom:10px"),
+                 
+                 useShinyalert(rmd = FALSE),
  
                   #1d insert button to close the order ----
  
@@ -126,6 +130,7 @@ shinyUI <- fluidPage(
                  #tabsetPanel(id = "inTabset",
                  #           tabPanel(title = "Order_Detail", value = "panel1",
                  titlePanel("Selected Closed Order Detail"),
+                 helpText("This tab allows you to see today's closed orders and takings and to download orders from past dates"),
                  
                  #1c Display Drilldown Data - i.e. details of selected order ----
                  dataTableOutput("drilldownClosed"),
@@ -144,7 +149,10 @@ shinyUI <- fluidPage(
                  dateInput(inputId = 'dateFrom', label = 'Date From'),
                  dateInput(inputId = 'dateTo', label = 'Date To'),
                  
-                 downloadButton("downloadData", "Download")
+                 downloadButton("downloadData", "Download"),
+                 
+                 actionButton(inputId = 'takingsSum', label = "Update Today's Takings Summary"),
+                 tableOutput('takingsTab')
                )
              )
           )
@@ -389,20 +397,56 @@ shinyServer <- function(input, output, session) {
       
       #shiny::validate(need(input$BillType == "Order", "Error: App is in 'Billing by Table' Mode so cannot close individual orders."))
       
-      cn <- conn()
-      query1 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
-      values$close_order_from_sql <- dbGetQuery(cn, query1)
-      query2 <- sqlInterpolate(cn, "DELETE FROM ?tbl WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
-      del_close_order <- dbSendStatement(cn, query2)
-      dbClearResult(del_close_order)
-      dbWriteTable(cn, name = paste0("Closed", values$tbl_pub), value = values$close_order_from_sql, append = TRUE)
-      dbDisconnect(cn)
-      values$open_orders_from_sql <- loadDat()
+      shinyalert(
+        text = "Paid by Card or Cash?",
+        showConfirmButton = TRUE,
+        showCancelButton = TRUE,
+        confirmButtonText = "Card",
+        cancelButtonText = "Cash",
+        callbackR = function(x) { if(x != FALSE) {
+          print(values$selected)
+          cn <- conn()
+          query2 <- sqlInterpolate(cn, "UPDATE ?tbl SET OrderStatus = 'Card' WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
+          close_order_from_sql <- dbSendStatement(cn, query2)
+          dbClearResult(close_order_from_sql)
+          query1 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
+          values$close_order_from_sql <- dbGetQuery(cn, query1)
+          query2 <- sqlInterpolate(cn, "DELETE FROM ?tbl WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
+          del_close_order <- dbSendStatement(cn, query2)
+          dbClearResult(del_close_order)
+          dbWriteTable(cn, name = paste0("Closed", values$tbl_pub), value = values$close_order_from_sql, append = TRUE)
+          dbDisconnect(cn)
+          values$open_orders_from_sql <- loadDat()
+          
+          values$summary_orders <- fn_update_display()
+          output$DTtable <- DT::renderDataTable(rownames = FALSE, selection = 'single', options = list(paging = FALSE, searching = FALSE, bInfo = FALSE), isolate({
+            values$summary_orders
+          }))
+        } else {
+          print(values$selected)
+          cn <- conn()
+          query2 <- sqlInterpolate(cn, "UPDATE ?tbl SET OrderStatus = 'Cash' WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
+          close_order_from_sql <- dbSendStatement(cn, query2)
+          dbClearResult(close_order_from_sql)
+          query1 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
+          values$close_order_from_sql <- dbGetQuery(cn, query1)
+          query2 <- sqlInterpolate(cn, "DELETE FROM ?tbl WHERE OrderNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(values$selected))
+          del_close_order <- dbSendStatement(cn, query2)
+          dbClearResult(del_close_order)
+          dbWriteTable(cn, name = paste0("Closed", values$tbl_pub), value = values$close_order_from_sql, append = TRUE)
+          dbDisconnect(cn)
+          values$open_orders_from_sql <- loadDat()
+          
+          values$summary_orders <- fn_update_display()
+          output$DTtable <- DT::renderDataTable(rownames = FALSE, selection = 'single', options = list(paging = FALSE, searching = FALSE, bInfo = FALSE), isolate({
+            values$summary_orders
+          }))
+        }
+        }, 
+        inputId = "shinyalertCollect"
+      )
       
-      values$summary_orders <- fn_update_display()
-      output$DTtable <- DT::renderDataTable(rownames = FALSE, selection = 'single', options = list(paging = FALSE, searching = FALSE, bInfo = FALSE), isolate({
-        values$summary_orders
-      }))
+
       
     })
     
@@ -496,40 +540,94 @@ shinyServer <- function(input, output, session) {
       
       #shiny::validate(need(input$BillType == "Order", "Error: App is in 'Billing by Table' Mode so cannot close individual orders."))
       
-      cn <- conn()
-      #query4 <- sqlInterpolate(cn, "UPDATE ?tbl SET OrderStatus = 'Closed' WHERE TableNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(input$SelectedTab))
-      #update_cancellations <- dbSendStatement(cn, query4)
-      #dbClearResult(update_cancellations)
-      query2 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE TableNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(input$SelectedTab))
-      values$tbl_close <- dbGetQuery(cn, query2)
-      query3 <- sqlInterpolate(cn, "DELETE FROM ?tbl WHERE TableNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(input$SelectedTab))
-      del_close_order <- dbSendStatement(cn, query3)
-      dbClearResult(del_close_order)
-      dbWriteTable(cn, name = paste0("Closed", values$tbl_pub), value = values$tbl_close, append = TRUE)
+      shinyalert(
+        text = "Paid by Card or Cash?",
+        showConfirmButton = TRUE,
+        showCancelButton = TRUE,
+        confirmButtonText = "Card",
+        cancelButtonText = "Cash",
+        callbackR = function(x) { if(x != FALSE) {
+          cn <- conn()
+          query4 <- sqlInterpolate(cn, "UPDATE ?tbl SET OrderStatus = 'Cash' WHERE TableNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(input$SelectedTab))
+          close_order_from_sql <- dbSendStatement(cn, query4)
+          dbClearResult(close_order_from_sql)
+          #query4 <- sqlInterpolate(cn, "UPDATE ?tbl SET OrderStatus = 'Closed' WHERE TableNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(input$SelectedTab))
+          #update_cancellations <- dbSendStatement(cn, query4)
+          #dbClearResult(update_cancellations)
+          query2 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE TableNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(input$SelectedTab))
+          values$tbl_close <- dbGetQuery(cn, query2)
+          query3 <- sqlInterpolate(cn, "DELETE FROM ?tbl WHERE TableNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(input$SelectedTab))
+          del_close_order <- dbSendStatement(cn, query3)
+          dbClearResult(del_close_order)
+          dbWriteTable(cn, name = paste0("Closed", values$tbl_pub), value = values$tbl_close, append = TRUE)
+          
+          dbDisconnect(cn)
+          values$open_orders_from_sql <- loadDat()
+          
+          showTab(inputId = "inTabset", target = "panel2")
+          updateTabsetPanel(session, "inTabset",
+                            selected = "panel2")
+          
+          hideTab(inputId = "inTabset", target = "panel3")
+          
+          values$toDisplay <- values$open_orders_from_sql
+          #values$summary_orders <- group_by(values$toDisplay, OrderNumber) %>%
+          #  summarise(Count = n())
+          
+          if(is.null(dim(values$toDisplay)[[1]]) | dim(values$toDisplay)[[1]] == 0) 
+          {values$summary_orders <- data.frame(OrderNumber = 0, Count = 0)} else {
+            values$summary_orders <- as.data.frame(table(values$toDisplay$OrderNumber))
+            names(values$summary_orders) <- c("OrderNumber", "Count")
+            values$summary_orders$OrderNumber <- as.numeric(as.character(values$summary_orders$OrderNumber))  
+          }
+          
+          output$DTtable <- DT::renderDataTable(rownames = FALSE, selection = 'single', options = list(paging = FALSE, searching = FALSE, bInfo = FALSE), isolate({
+            values$summary_orders
+          }))
+        } else {
+          cn <- conn()
+          query5 <- sqlInterpolate(cn, "UPDATE ?tbl SET OrderStatus = 'Card' WHERE TableNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(input$SelectedTab))
+          close_order_from_sql <- dbSendStatement(cn, query5)
+          dbClearResult(close_order_from_sql)
+          #query4 <- sqlInterpolate(cn, "UPDATE ?tbl SET OrderStatus = 'Closed' WHERE TableNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(input$SelectedTab))
+          #update_cancellations <- dbSendStatement(cn, query4)
+          #dbClearResult(update_cancellations)
+          query2 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE TableNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(input$SelectedTab))
+          values$tbl_close <- dbGetQuery(cn, query2)
+          query3 <- sqlInterpolate(cn, "DELETE FROM ?tbl WHERE TableNumber = ?num", tbl = SQL(values$tbl_pub), num = SQL(input$SelectedTab))
+          del_close_order <- dbSendStatement(cn, query3)
+          dbClearResult(del_close_order)
+          dbWriteTable(cn, name = paste0("Closed", values$tbl_pub), value = values$tbl_close, append = TRUE)
+          
+          dbDisconnect(cn)
+          values$open_orders_from_sql <- loadDat()
+          
+          showTab(inputId = "inTabset", target = "panel2")
+          updateTabsetPanel(session, "inTabset",
+                            selected = "panel2")
+          
+          hideTab(inputId = "inTabset", target = "panel3")
+          
+          values$toDisplay <- values$open_orders_from_sql
+          #values$summary_orders <- group_by(values$toDisplay, OrderNumber) %>%
+          #  summarise(Count = n())
+          
+          if(is.null(dim(values$toDisplay)[[1]]) | dim(values$toDisplay)[[1]] == 0) 
+          {values$summary_orders <- data.frame(OrderNumber = 0, Count = 0)} else {
+            values$summary_orders <- as.data.frame(table(values$toDisplay$OrderNumber))
+            names(values$summary_orders) <- c("OrderNumber", "Count")
+            values$summary_orders$OrderNumber <- as.numeric(as.character(values$summary_orders$OrderNumber))  
+          }
+          
+          output$DTtable <- DT::renderDataTable(rownames = FALSE, selection = 'single', options = list(paging = FALSE, searching = FALSE, bInfo = FALSE), isolate({
+            values$summary_orders
+          }))
+        }
+        }, 
+        inputId = "shinyalertCloseTable"
+      )
       
-      dbDisconnect(cn)
-      values$open_orders_from_sql <- loadDat()
       
-      showTab(inputId = "inTabset", target = "panel2")
-      updateTabsetPanel(session, "inTabset",
-                        selected = "panel2")
-      
-      hideTab(inputId = "inTabset", target = "panel3")
-      
-      values$toDisplay <- values$open_orders_from_sql
-      #values$summary_orders <- group_by(values$toDisplay, OrderNumber) %>%
-      #  summarise(Count = n())
-      
-      if(is.null(dim(values$toDisplay)[[1]]) | dim(values$toDisplay)[[1]] == 0) 
-      {values$summary_orders <- data.frame(OrderNumber = 0, Count = 0)} else {
-        values$summary_orders <- as.data.frame(table(values$toDisplay$OrderNumber))
-        names(values$summary_orders) <- c("OrderNumber", "Count")
-        values$summary_orders$OrderNumber <- as.numeric(as.character(values$summary_orders$OrderNumber))  
-      }
-      
-      output$DTtable <- DT::renderDataTable(rownames = FALSE, selection = 'single', options = list(paging = FALSE, searching = FALSE, bInfo = FALSE), isolate({
-        values$summary_orders
-      }))
       
     })
     
@@ -588,20 +686,12 @@ shinyServer <- function(input, output, session) {
                       dbname = values$db
       )
       
-      values$query <- sqlInterpolate(cn, "SELECT * FROM ?tbl", tbl = SQL(values$tbl_pubClosed))
+      values$query <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE DATE(SUBSTRING(OrderQrRef, LENGTH(OrderQrRef) - (6 + 19), 19)) = CURDATE()", tbl = SQL(values$tbl_pubClosed))
       values$closed_orders_from_sql <- dbGetQuery(cn, values$query)
       dbDisconnect(cn)
       values$toDisplayClosed <- values$closed_orders_from_sql
       
-      #cons<-DBI::dbListConnections(RMariaDB::MariaDB())
-      #for(con in cons) dbDisconnect(con)
-      
-      # summarise table
-      
-      #values$summary_orders <- group_by(values$toDisplay, OrderNumber) %>%
-      #  summarise(Count = n())
-      
-      if(is.null(dim(values$toDisplayClosed)[[1]])) 
+      if((is.null(dim(values$toDisplayClosed)[[1]]) | dim(values$toDisplayClosed)[[1]] == 0)) 
       {values$summary_ordersClosed <- data.frame(OrderNumber = 0, Count = 0)} else {
         values$summary_ordersClosed <- as.data.frame(table(values$toDisplayClosed$OrderNumber))
         names(values$summary_ordersClosed) <- c("OrderNumber", "Count")
@@ -642,6 +732,8 @@ shinyServer <- function(input, output, session) {
     
     observeEvent(input$refreshOrdersClosed, {
       
+      #removeUI('#takingsTab')
+      
       values$db <- "BAR"
       cn <- dbConnect(drv      = RMariaDB::MariaDB(),
                       username = options()$mysql$user,
@@ -651,16 +743,17 @@ shinyServer <- function(input, output, session) {
                       dbname = values$db
       )
       
-      values$query4 <- sqlInterpolate(cn, "SELECT * FROM ?tbl", tbl = SQL(values$tbl_pubClosed))
-      values$toDisplayClosed <- dbGetQuery(cn, values$query4)
+      values$query4 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE DATE(SUBSTRING(OrderQrRef, LENGTH(OrderQrRef) - (6 + 19), 19)) = CURDATE()", tbl = SQL(values$tbl_pubClosed))
+      values$closed_orders_from_sql <- dbGetQuery(cn, values$query4)
       dbDisconnect(cn)
+      values$toDisplayClosed <- values$closed_orders_from_sql
       
       # summarise table
       
       #values$summary_orders <- group_by(values$toDisplay, OrderNumber) %>%
       #  summarise(Count = n())
       
-      if(is.null(dim(values$toDisplayClosed)[[1]])) 
+      if((is.null(dim(values$toDisplayClosed)[[1]]) | dim(values$toDisplayClosed)[[1]] == 0))
       {values$summary_ordersClosed <- data.frame(OrderNumber = 0, Count = 0)} else {
         values$summary_ordersClosed <- as.data.frame(table(values$toDisplayClosed$OrderNumber))
         names(values$summary_ordersClosed) <- c("OrderNumber", "Count")
@@ -679,18 +772,55 @@ shinyServer <- function(input, output, session) {
         paste("ClosedOrderDownload", Sys.Date(), ".csv", sep="")
       },
       content = function(file) {
-        start_char <- nchar(venue) + 1
-        end_char <- nchar(venue) + 10
+        #start_char <- nchar(venue) + 1
+        #end_char <- nchar(venue) + 10
+        values$db <- "BAR"
+        cn <- dbConnect(drv      = RMariaDB::MariaDB(),
+                        username = options()$mysql$user,
+                        password = options()$mysql$password,
+                        host     = options()$mysql$host,
+                        port     = options()$mysql$port,
+                        dbname = values$db
+        )
+        startDate <- as.character(input$dateFrom)
+        endDate <- as.character(input$dateTo)
+        values$query4 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE DATE(SUBSTRING(OrderQrRef, LENGTH(OrderQrRef) - (6 + 19), 19)) BETWEEN ?dtFrom AND ?dtTo"
+                                        , tbl = SQL(tbl_pubClosed), dtFrom = SQL(paste0("'",startDate,"'")), dtTo = SQL(paste0("'",endDate,"'")))
+        values$closed_orders_from_sqlDown <- dbGetQuery(cn, values$query4)
+        dbDisconnect(cn)
+        values$toDisplayClosedDown <- values$closed_orders_from_sqlDown
         write.csv(
-          values$toDisplayClosed[(as.Date(substring(values$toDisplayClosed$OrderQrRef, start_char, end_char)) >= input$dateFrom) & (as.Date(substring(values$toDisplayClosed$OrderQrRef, start_char, end_char)) <= input$dateTo),]
+          values$toDisplayClosedDown
           , row.names = FALSE
           , file)
       }
     )
     
-    #observeEvent(input$downloadClosed, {
-    #xpTable <- values$toDisplayClosed[(as.Date(substring(values$toDisplay$QrRef, start_char, end_char)) >= input$dateFrom) & (as.Date(substring(values$toDisplay$QrRef, start_char, end_char)) <= input$dateTo),]
-    #print(xpTable)
+    observeEvent(input$takingsSum, {
+      
+      #insertUI()
+      
+      values$db <- "BAR"
+      cn <- dbConnect(drv      = RMariaDB::MariaDB(),
+                      username = options()$mysql$user,
+                      password = options()$mysql$password,
+                      host     = options()$mysql$host,
+                      port     = options()$mysql$port,
+                      dbname = values$db
+      )
+      
+      values$query4 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE DATE(SUBSTRING(OrderQrRef, LENGTH(OrderQrRef) - (6 + 19), 19)) = CURDATE()", tbl = SQL(values$tbl_pubClosed))
+      values$closed_orders_from_sql <- dbGetQuery(cn, values$query4)
+      dbDisconnect(cn)
+      values$toDisplayClosed <- values$closed_orders_from_sql
+      
+      if((is.null(dim(values$toDisplayClosed)[[1]]) | dim(values$toDisplayClosed)[[1]] == 0)) {} else {
+        values$takings <- aggregate(Price ~ OrderStatus, data = values$toDisplayClosed[values$toDisplayClosed$Item == 'Total', ], FUN=sum)
+        values$takings <- rbind(values$takings, c("Total", sum(values$takings$Price)))
+        names(values$takings)[[2]] <- "Takings"
+        output$takingsTab <- renderTable(values$takings)
+      }
+    })
     
   })
 } 
