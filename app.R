@@ -110,7 +110,7 @@ shinyUI <- fluidPage(
  
                   #1e insert button to refresh order list ----
                   helpText("The list of orders will refresh each time an existing order is closed.  To refresh the list of orders without closing an order, click 'Refresh View'")
- 
+
                )
              )
           ),
@@ -152,10 +152,50 @@ shinyUI <- fluidPage(
                  downloadButton("downloadData", "Download"),
                  
                  actionButton(inputId = 'takingsSum', label = "Update Today's Takings Summary"),
-                 tableOutput('takingsTab')
+                 div(style="margin-bottom:10px"),
+                 tableOutput('takingsTab'),
+
+                 actionButton(inputId = 'goToNHS', label = 'Click to fullfill NHS Data request')
                )
              )
-          )
+          ),
+    
+    tabPanel(title = "Confirm Password for NHS Track and Trace Download", value = "panel5",
+             #1a select pub & login ----
+             helpText("Confirm Password to Access NHS request for info Download"),
+             #tags$h2("Login"),
+             textInput(inputId = "PsWdNHS", label = "Password"),
+             actionButton(inputId = "loginNHS", label = "Continue"),
+             div(style="margin-bottom:10px"),
+             textOutput(outputId = "passCheckNHS")
+    ),
+    
+    tabPanel(title = "Download Information to deliver to NHS Track & Trace", value = "panel6",
+             sidebarLayout(
+               sidebarPanel(
+                 
+                 #1b display summary of orders available to drill into ----
+                 #tags$h2("DownLoad Information For NHS Track & Trace Query"),
+                 
+               ),
+               mainPanel(
+                 
+                 titlePanel("DownLoad Information For NHS Track & Trace Query"),
+                 helpText("This tab allows you to DownLoad Personal Information from the last 21 days"),
+                 helpText("This info is to be shared to NHS Track & Track, in line with GDPR policy"),
+                 helpText("No other sharing or usage is permitted"),
+                 
+                 
+                 dateInput(inputId = 'dateFromNHS', label = 'Date From'),
+                 dateInput(inputId = 'dateToNHS', label = 'Date To'),
+                 
+                 downloadButton("downloadDataNHS", "Download"),
+                 
+                 actionButton(inputId = 'closeTabNHS', label = 'Return to Order View')
+                 
+               )
+             )
+    )
   )
 )
 
@@ -174,6 +214,8 @@ shinyServer <- function(input, output, session) {
   hideTab(inputId = "inTabset", target = "panel2")
   hideTab(inputId = "inTabset", target = "panel3")
   hideTab(inputId = "inTabset", target = "panel4")
+  hideTab(inputId = "inTabset", target = "panel5")
+  hideTab(inputId = "inTabset", target = "panel6")
   values <- reactiveValues()
 
   #set working drive to be working drive for app
@@ -766,7 +808,7 @@ shinyServer <- function(input, output, session) {
       values$num_ordersClosed <- dim(values$closed_orders_from_sql)[[1]]
 
     })
-    
+
     output$downloadData <- downloadHandler(
       filename = function() {
         paste("ClosedOrderDownload", Sys.Date(), ".csv", sep="")
@@ -785,7 +827,7 @@ shinyServer <- function(input, output, session) {
         startDate <- as.character(input$dateFrom)
         endDate <- as.character(input$dateTo)
         values$query4 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE DATE(SUBSTRING(OrderQrRef, LENGTH(OrderQrRef) - (6 + 19), 19)) BETWEEN ?dtFrom AND ?dtTo"
-                                        , tbl = SQL(tbl_pubClosed), dtFrom = SQL(paste0("'",startDate,"'")), dtTo = SQL(paste0("'",endDate,"'")))
+                                        , tbl = SQL(values$tbl_pubClosed), dtFrom = SQL(paste0("'",startDate,"'")), dtTo = SQL(paste0("'",endDate,"'")))
         values$closed_orders_from_sqlDown <- dbGetQuery(cn, values$query4)
         dbDisconnect(cn)
         values$toDisplayClosedDown <- values$closed_orders_from_sqlDown
@@ -820,6 +862,68 @@ shinyServer <- function(input, output, session) {
         names(values$takings)[[2]] <- "Takings"
         output$takingsTab <- renderTable(values$takings)
       }
+    })
+    
+    observeEvent(input$goToNHS, {
+      
+      showTab(inputId = "inTabset", target = "panel5")
+      hideTab(inputId = "inTabset", target = "panel1")
+      hideTab(inputId = "inTabset", target = "panel2")
+      hideTab(inputId = "inTabset", target = "panel3")
+      hideTab(inputId = "inTabset", target = "panel4")
+      hideTab(inputId = "inTabset", target = "panel6")
+      
+      observeEvent(input$loginNHS, {
+        
+        if(input$loginNHS > 3) {Sys.sleep(10*input$loginNHS - 30)}
+        output$passCheckNHS <- renderText({
+          validate(need(input$PsWdNHS == Sys.getenv("VenuePsWd"), message = "Error: incorrect password"))
+          ""
+        })
+        
+        validate(need(input$PsWdNHS == Sys.getenv("VenuePsWd"), message = "Error: incorrect password"))
+        showTab(inputId = "inTabset", target = "panel6")
+        hideTab(inputId = "inTabset", target = "panel5")
+        
+        values$RecordstblName <- paste0(input$TestCentre, "Records")
+        
+        output$downloadDataNHS <- downloadHandler(
+          filename = function() {
+            paste("RecordsForNHSDownload", Sys.Date(), ".csv", sep="")
+          },
+          content = function(file) {
+            values$db <- "BAR"
+            cn <- dbConnect(drv      = RMariaDB::MariaDB(),
+                            username = options()$mysql$user,
+                            password = options()$mysql$password,
+                            host     = options()$mysql$host,
+                            port     = options()$mysql$port,
+                            dbname = values$db
+            )
+            startDate <- as.character(input$dateFromNHS)
+            endDate <- as.character(input$dateToNHS)
+            values$query5 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE DATE(SUBSTRING(OrderQrRef, LENGTH(OrderQrRef) - (6 + 19), 19)) BETWEEN ?dtFrom AND ?dtTo"
+                                            , tbl = SQL(values$RecordstblName), dtFrom = SQL(paste0("'",startDate,"'")), dtTo = SQL(paste0("'",endDate,"'")))
+            values$RecordsForNHS_sqlDown <- dbGetQuery(cn, values$query5)
+            dbDisconnect(cn)
+            values$toWriteNHS <- values$RecordsForNHS_sqlDown
+            write.csv(
+              values$toWriteNHS
+              , row.names = FALSE
+              , file)
+          }
+        )
+        
+        observeEvent(input$closeTabNHS, {
+          
+          showTab(inputId = "inTabset", target = "panel2")
+          showTab(inputId = "inTabset", target = "panel4")
+          hideTab(inputId = "inTabset", target = "panel6")
+          
+        })
+        
+      })
+
     })
     
   })
