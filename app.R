@@ -728,7 +728,7 @@ shinyServer <- function(input, output, session) {
                       dbname = values$db
       )
       
-      values$query <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE DATE(SUBSTRING(OrderQrRef, LENGTH(OrderQrRef) - (6 + 19), 19)) = CURDATE()", tbl = SQL(values$tbl_pubClosed))
+      values$query <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE DATE(SUBSTRING(OrderQrRef,  1, 10)) = CURDATE()", tbl = SQL(values$tbl_pubClosed))
       values$closed_orders_from_sql <- dbGetQuery(cn, values$query)
       dbDisconnect(cn)
       values$toDisplayClosed <- values$closed_orders_from_sql
@@ -785,7 +785,7 @@ shinyServer <- function(input, output, session) {
                       dbname = values$db
       )
       
-      values$query4 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE DATE(SUBSTRING(OrderQrRef, LENGTH(OrderQrRef) - (6 + 19), 19)) = CURDATE()", tbl = SQL(values$tbl_pubClosed))
+      values$query4 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE DATE(SUBSTRING(OrderQrRef,  1, 10)) = CURDATE()", tbl = SQL(values$tbl_pubClosed))
       values$closed_orders_from_sql <- dbGetQuery(cn, values$query4)
       dbDisconnect(cn)
       values$toDisplayClosed <- values$closed_orders_from_sql
@@ -826,7 +826,7 @@ shinyServer <- function(input, output, session) {
         )
         startDate <- as.character(input$dateFrom)
         endDate <- as.character(input$dateTo)
-        values$query4 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE DATE(SUBSTRING(OrderQrRef, LENGTH(OrderQrRef) - (6 + 19), 19)) BETWEEN ?dtFrom AND ?dtTo"
+        values$query4 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE DATE(SUBSTRING(OrderQrRef, 1, 10)) BETWEEN ?dtFrom AND ?dtTo"
                                         , tbl = SQL(values$tbl_pubClosed), dtFrom = SQL(paste0("'",startDate,"'")), dtTo = SQL(paste0("'",endDate,"'")))
         values$closed_orders_from_sqlDown <- dbGetQuery(cn, values$query4)
         dbDisconnect(cn)
@@ -851,7 +851,7 @@ shinyServer <- function(input, output, session) {
                       dbname = values$db
       )
       
-      values$query4 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE DATE(SUBSTRING(OrderQrRef, LENGTH(OrderQrRef) - (6 + 19), 19)) = CURDATE()", tbl = SQL(values$tbl_pubClosed))
+      values$query4 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE DATE(SUBSTRING(OrderQrRef,  1, 10)) = CURDATE()", tbl = SQL(values$tbl_pubClosed))
       values$closed_orders_from_sql <- dbGetQuery(cn, values$query4)
       dbDisconnect(cn)
       values$toDisplayClosed <- values$closed_orders_from_sql
@@ -902,7 +902,7 @@ shinyServer <- function(input, output, session) {
             )
             startDate <- as.character(input$dateFromNHS)
             endDate <- as.character(input$dateToNHS)
-            values$query5 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE DATE(SUBSTRING(OrderQrRef, LENGTH(OrderQrRef) - (6 + 19), 19)) BETWEEN ?dtFrom AND ?dtTo"
+            values$query5 <- sqlInterpolate(cn, "SELECT * FROM ?tbl WHERE DATE(SUBSTRING(OrderQrRef,  1, 10)) BETWEEN ?dtFrom AND ?dtTo"
                                             , tbl = SQL(values$RecordstblName), dtFrom = SQL(paste0("'",startDate,"'")), dtTo = SQL(paste0("'",endDate,"'")))
             values$RecordsForNHS_sqlDown <- dbGetQuery(cn, values$query5)
             dbDisconnect(cn)
