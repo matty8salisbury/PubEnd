@@ -165,6 +165,7 @@ shinyUI <- fluidPage(
              helpText("Confirm Password to Access NHS request for info Download"),
              #tags$h2("Login"),
              textInput(inputId = "PsWdNHS", label = "Password"),
+             textInput(inputId = "secureToken", label = "Security Token"),
              actionButton(inputId = "loginNHS", label = "Continue"),
              div(style="margin-bottom:10px"),
              textOutput(outputId = "passCheckNHS")
@@ -877,11 +878,13 @@ shinyServer <- function(input, output, session) {
         
         if(input$loginNHS > 3) {Sys.sleep(10*input$loginNHS - 30)}
         output$passCheckNHS <- renderText({
-          validate(need(input$PsWdNHS == Sys.getenv("VenuePsWd"), message = "Error: incorrect password"))
+          validate(need(input$PsWdNHS == Sys.getenv("VenuePsWd"), message = "Error: incorrect password or security token"))
+          validate(need(input$secureToken == Sys.getenv("securityToken"), message = "Error: incorrect password or security token"))
           ""
         })
         
-        validate(need(input$PsWdNHS == Sys.getenv("VenuePsWd"), message = "Error: incorrect password"))
+        validate(need(input$PsWdNHS == Sys.getenv("VenuePsWd"), message = "Error: incorrect password or security token"))
+        validate(need(input$secureToken == Sys.getenv("securityToken"), message = "Error: incorrect password or security token"))
         showTab(inputId = "inTabset", target = "panel6")
         hideTab(inputId = "inTabset", target = "panel5")
         
@@ -915,11 +918,7 @@ shinyServer <- function(input, output, session) {
         )
         
         observeEvent(input$closeTabNHS, {
-          
-          showTab(inputId = "inTabset", target = "panel2")
-          showTab(inputId = "inTabset", target = "panel4")
-          hideTab(inputId = "inTabset", target = "panel6")
-          
+                    session$reload()
         })
         
       })
