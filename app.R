@@ -7,6 +7,7 @@ library("DT")
 library("RMariaDB")
 library("DBI")
 library("shinyalert")
+source('venueinfo.R')
 
 #1. SHINY UI FUNCTION ----
 
