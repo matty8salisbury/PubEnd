@@ -7,7 +7,7 @@ library("DT")
 library("RMariaDB")
 library("DBI")
 library("shinyalert")
-source('/OrderApp/venueinfo.R')
+source('~/OrderApp/venueinfo.R')
 
 #1. SHINY UI FUNCTION ----
 
