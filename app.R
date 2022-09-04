@@ -57,7 +57,8 @@ shinyUI <- fluidPage(
           dataTableOutput("drilldown"),
           div(style="margin-bottom:10px"),
           
-          useShinyalert(rmd = FALSE),
+          #useShinyalert(rmd = FALSE),
+          useShinyalert(),
 
           #1d insert button to close the order and  --------
 
@@ -98,7 +99,8 @@ shinyUI <- fluidPage(
                  dataTableOutput("DTviewByTable"),
                  div(style="margin-bottom:10px"),
                  
-                 useShinyalert(rmd = FALSE),
+                 #useShinyalert(rmd = FALSE),
+                 useShinyalert(),
  
                   #1d insert button to close the order ----
  
