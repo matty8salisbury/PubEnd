@@ -315,7 +315,7 @@ shinyServer <- function(input, output, session) {
       #dbGetQuery(cn, paste0("RENAME TABLE `",RecordstblName, "` TO ", paste0("`",RecordstblName, "Archive", gm_date(),"`")))
       #create new live orders table
       cn <- conn()
-      DBI::dbWriteTable(cn, name = RecordstblName, value = Records, overwrite = TRUE, field.types = c(
+      DBI::dbWriteTable(cn, name = RecordstblName, value = Records, overwrite = TRUE, row.names = FALSE, field.types = c(
         OrderName = "varchar(50)", OrderEmail = "varchar(50)", OrderTimeIn = "varchar(50)", OrderIntPhone = "double", OrderPhone = "double", OrderNumber = "double", OrderQrRef = "varchar(50)", OrderTimeOut = "varchar(50)"
       ))
       dbDisconnect(cn)
