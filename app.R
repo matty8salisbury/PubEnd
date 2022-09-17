@@ -307,7 +307,7 @@ shinyServer <- function(input, output, session) {
       
       a <- input$TestCentre
       Records <- data.frame(
-        row_names = "", OrderName = "", OrderEmail = "", OrderTimeIn = "", OrderIntPhone = 0, OrderPhone = 0, OrderNumber = 0, OrderQrRef = "", OrderTimeOut = ""
+        OrderName = "", OrderEmail = "", OrderTimeIn = "", OrderIntPhone = 0, OrderPhone = 0, OrderNumber = 0, OrderQrRef = "", OrderTimeOut = ""
         , stringsAsFactors = FALSE)
       
       RecordstblName <- paste0(a, "Records")  
@@ -316,7 +316,7 @@ shinyServer <- function(input, output, session) {
       #create new live orders table
       cn <- conn()
       DBI::dbWriteTable(cn, name = RecordstblName, value = Records, overwrite = TRUE, field.types = c(
-        row_names = "varchar(50)", OrderName = "varchar(50)", OrderEmail = "varchar(50)", OrderTimeIn = "varchar(50)", OrderIntPhone = "double", OrderPhone = "double", OrderNumber = "double", OrderQrRef = "varchar(50)", OrderTimeOut = "varchar(50)"
+        OrderName = "varchar(50)", OrderEmail = "varchar(50)", OrderTimeIn = "varchar(50)", OrderIntPhone = "double", OrderPhone = "double", OrderNumber = "double", OrderQrRef = "varchar(50)", OrderTimeOut = "varchar(50)"
       ))
       dbDisconnect(cn)
       
