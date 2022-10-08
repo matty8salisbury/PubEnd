@@ -203,8 +203,21 @@ shinyUI <- fluidPage(
   )
 )
 
+# Wrap your UI with secure_app, enabled admin mode or not
+ui <- secure_app(ui, enable_admin = TRUE)
+
+
 shinyServer <- function(input, output, session) {
 
+  # check_credentials directly on sqlite db
+  res_auth <- secure_server(
+    check_credentials = check_credentials(
+      "/home/shiny/database.sqlite",
+      #passphrase = key_get("R-shinymanager-key", "obiwankenobi")
+      passphrase = "bananaVacuum291"
+    )
+  )
+  
   #0. Set required inputs for connect ----
   options(mysql = list(
     "host" = Sys.getenv("SQL_ENDPOINT"),
@@ -230,6 +243,8 @@ shinyServer <- function(input, output, session) {
   output$SelectedPub <- renderUI({selectInput(inputId = 'TestCentre',
                                                      label = 'Venue',
                                                      choices = pubList)})
+  
+  
   
   
   observeEvent(input$login, {
