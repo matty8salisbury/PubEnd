@@ -205,7 +205,7 @@ shinyUI <- fluidPage(
 )
 
 # Wrap your UI with secure_app, enabled admin mode or not
-ui <- secure_app(ui, enable_admin = TRUE)
+ui <- secure_app(shinyUI, enable_admin = TRUE)
 
 
 shinyServer <- function(input, output, session) {
@@ -947,6 +947,6 @@ shinyServer <- function(input, output, session) {
   })
 } 
 
-shinyApp(ui = shinyUI, server = shinyServer)
+shinyApp(ui = ui, server = shinyServer)
 
 
