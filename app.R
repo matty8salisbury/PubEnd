@@ -1,6 +1,7 @@
 
 library("shiny")
 library("shinyWidgets")
+library("shinymanager")
 library("DT")
 
 #install libraries for database update
