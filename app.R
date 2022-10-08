@@ -22,7 +22,7 @@ shinyUI <- fluidPage(
        tags$h2("Login"),
        uiOutput(outputId = "SelectedPub"),
 
-       textInput(inputId = "PsWd", label = "Password"),
+       #textInput(inputId = "PsWd", label = "Password"),
        
        actionButton(inputId = "login", label = "login"),
        div(style="margin-bottom:10px"),
@@ -249,13 +249,13 @@ shinyServer <- function(input, output, session) {
   
   observeEvent(input$login, {
 
-    if(input$login > 3) {Sys.sleep(10*input$login - 30)}
-    output$passCheck <- renderText({
-      validate(need(input$PsWd == Sys.getenv("VenuePsWd"), message = "Error: incorrect password"))
-      ""
-    })
+    #if(input$login > 3) {Sys.sleep(10*input$login - 30)}
+    #output$passCheck <- renderText({
+    #  validate(need(input$PsWd == Sys.getenv("VenuePsWd"), message = "Error: incorrect password"))
+    #  ""
+    #})
     
-    validate(need(input$PsWd == Sys.getenv("VenuePsWd"), message = "Error: incorrect password"))
+    #validate(need(input$PsWd == Sys.getenv("VenuePsWd"), message = "Error: incorrect password"))
     
     showTab(inputId = "inTabset", target = "panel2")
     updateTabsetPanel(session, "inTabset",
