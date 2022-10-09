@@ -215,7 +215,7 @@ shinyServer <- function(input, output, session) {
     check_credentials = check_credentials(
       "/home/shiny/database.sqlite",
       #passphrase = key_get("R-shinymanager-key", "obiwankenobi")
-      passphrase = "bananaVacuum291"
+      passphrase = "bananaVacuum291?"
     )
   )
   
