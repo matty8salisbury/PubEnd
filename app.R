@@ -244,6 +244,7 @@ shinyServer <- function(input, output, session) {
   hideTab(inputId = "inTabset", target = "panel4")
   hideTab(inputId = "inTabset", target = "panel5")
   hideTab(inputId = "inTabset", target = "panel6")
+  hideTab(inputId = "inTabset", target = "panel7")
   values <- reactiveValues()
 
   #set working drive to be working drive for app
@@ -273,6 +274,7 @@ shinyServer <- function(input, output, session) {
                       selected = "panel2")
     showTab(inputId = "inTabset", target = "panel4")
     hideTab(inputId = "inTabset", target = "panel1")
+    showTab(inputId = "inTabset", target = "panel7")
     
     values$num_orders <- 0
     values$tbl_pub <- paste0(input$TestCentre, "Orders")
