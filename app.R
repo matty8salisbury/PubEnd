@@ -200,6 +200,16 @@ shinyUI <- fluidPage(
                  
                )
              )
+    ),
+    tabPanel(title = "Update Menu", value = "panel7",
+             #Provide Display Name, Postcode, Password
+             
+             #data file
+             fileInput(inputId = "uPriceListfile", label = "Upload Pricelist (csv file)", accept = ".csv"),
+             
+             #Submit button
+             actionButton(inputId = "updateMenuButton", label = "Update Menu")
+             
     )
   )
 )
@@ -943,7 +953,19 @@ shinyServer <- function(input, output, session) {
       })
 
     })
-    
+    output$uPriceList <- renderTable({
+      file <- input$uPriceListfile
+      ext <- tools::file_ext(file$datapath)
+      
+      req(file)
+      validate(need(ext == "csv", "Please upload a csv file"))
+      
+      uPriceList <- read.csv(file$datapath, header = T)
+      validate(need(names(priceList) == c("Item",	"Price",	"Section",	"Description"), "Please upload a csv file in the format request (i.e. set out with headings of: Item, Price, Section, Description)"))
+      
+      uPriceList
+    })
+    write.csv(uPriceList, 'home/shiny/OrderApp/priceList.csv')
   })
 } 
 
