@@ -956,7 +956,7 @@ shinyServer <- function(input, output, session) {
 
     })
     observeEvent(input$updateMenuButton, {
-      file <- input$uPriceListfile
+      file <- input$uPriceListFile
       uPriceList <- read.csv(file$datapath, header = T)
       validate(need(names(priceList) == c("Item",	"Price",	"Section",	"Description"), "Please upload a csv file in the format request (i.e. set out with headings of: Item, Price, Section, Description)"))
       write.csv(uPriceList, 'home/shiny/OrderApp/priceList.csv')
