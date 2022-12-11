@@ -963,9 +963,9 @@ shinyServer <- function(input, output, session) {
       uPriceList <- read.csv(file$datapath, header = T)
       validate(need(names(priceList) == c("Item",	"Price",	"Section",	"Description"), "Please upload a csv file in the format request (i.e. set out with headings of: Item, Price, Section, Description)"))
       
+      write.csv(uPriceList, 'home/shiny/OrderApp/priceList.csv')
       uPriceList
     })
-    write.csv(uPriceList, 'home/shiny/OrderApp/priceList.csv')
   })
 } 
 
