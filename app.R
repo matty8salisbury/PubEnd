@@ -959,17 +959,22 @@ shinyServer <- function(input, output, session) {
   })
   
   output$filepath <- renderText({input$uPriceListFile$datapath})
-  output$uPriceList <- renderTable({
-    file <- input$uPriceListFile
-    uPriceList <- read.csv(file$datapath, header = T)
-    write.csv(x=uPriceList, file='/home/shiny/OrderApp/price_list2.csv')
-    uPriceList
+  observeEvent(input$updateMenuButton, {
+    system2(command="cp", args = c(input$uPriceListFile$datapath, '/home/shiny/OrderApp/price_list.csv', stdout = TRUE)
   })
+  
+  #output$uPriceList <- renderTable({
+  #  file <- input$uPriceListFile
+  #  uPriceList <- read.csv(file$datapath, header = T)
+  #  write.csv(x=uPriceList, file='/home/shiny/OrderApp/price_list2.csv')
+  #  uPriceList
+  #})
   #output$priceList <- renderTable({
   #    file <- input$priceListfile
   #    priceList <- read.csv(file$datapath, header = T)
   #    write.csv(x=priceList, file=paste("/home/shiny/OrderApp/price_list-", gsub("_", "-", tolower(venueName)), ".csv", sep=""))
-  #  })
+  #})
+    
 } 
 
 shinyApp(ui = ui, server = shinyServer)
