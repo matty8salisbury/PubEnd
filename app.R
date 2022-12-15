@@ -212,7 +212,7 @@ shinyUI <- fluidPage(
              
              #show updated menu0
              #tableOutput("uPriceList"),
-             textOutput(outputId = "filepath")
+             textOutput(outputId = "menuUpdatedConfirmation")
     )
   )
 )
@@ -964,6 +964,7 @@ shinyServer <- function(input, output, session) {
     values$fileToCopy <- input$uPriceListFile$datapath
     system2(command="chmod", args = c("x", values$fileToCopy), stdout = TRUE)
     system2(command="cp", args = c(values$fileToCopy, '/home/shiny/OrderApp/price_list.csv'), stdout = TRUE)
+    output$menuUpdatedConfirmation <- renderText("Menu Updated")
   })
   
   #output$uPriceList <- renderTable({
