@@ -962,8 +962,8 @@ shinyServer <- function(input, output, session) {
   
   observeEvent(input$updateMenuButton, {
     values$fileToCopy <- input$uPriceListFile$datapath
-    system2(command="chmod", args = c("x", values$fileToCopy, stdout = TRUE)
-    system2(command="cp", args = c(values$fileToCopy, '/home/shiny/OrderApp/price_list.csv', stdout = TRUE)
+    system2(command="chmod", args = c("x", values$fileToCopy), stdout = TRUE)
+    system2(command="cp", args = c(values$fileToCopy, '/home/shiny/OrderApp/price_list.csv'), stdout = TRUE)
   })
   
   #output$uPriceList <- renderTable({
