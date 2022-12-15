@@ -211,7 +211,7 @@ shinyUI <- fluidPage(
              actionButton(inputId = "updateMenuButton", label = "Update Menu"),
              
              #show updated menu0
-             tableOutput("uPriceList"),
+             #tableOutput("uPriceList"),
              textOutput(outputId = "filepath")
     )
   )
