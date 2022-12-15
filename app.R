@@ -208,11 +208,11 @@ shinyUI <- fluidPage(
              fileInput(inputId = "uPriceListFile", label = "Upload Pricelist (csv file)", accept = ".csv"),
              
              #Submit button
-             actionButton(inputId = "updateMenuButton", label = "Update Menu")
+             actionButton(inputId = "updateMenuButton", label = "Update Menu"),
              
              #show updated menu
              #tableOutput("uPriceList")
-             #textOutput(outputId = "filepath")
+             textOutput(outputId = "filepath")
     )
   )
 )
