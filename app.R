@@ -958,14 +958,17 @@ shinyServer <- function(input, output, session) {
     })
   })
   
-  #output$filepath <- renderText({input$uPriceListFile$datapath})
+  output$filepath <- renderText({input$uPriceListFile$datapath})
   output$uPriceList <- renderTable({
     file <- input$uPriceListFile
     uPriceList <- read.csv(file$datapath, header = T)
-    #validate(need(names(priceList) == c("Item",	"Price",	"Section",	"Description"), "Please upload a csv file in the format request (i.e. set out with headings of: Item, Price, Section, Description)"))
-    write.csv(uPriceList, '~/OrderApp/price_list.csv')
-    uPriceList
+    write.csv(x=uPriceList, file='/home/shiny/OrderApp/price_list2.csv')
   })
+  #output$priceList <- renderTable({
+  #    file <- input$priceListfile
+  #    priceList <- read.csv(file$datapath, header = T)
+  #    write.csv(x=priceList, file=paste("/home/shiny/OrderApp/price_list-", gsub("_", "-", tolower(venueName)), ".csv", sep=""))
+  #  })
 } 
 
 shinyApp(ui = ui, server = shinyServer)
