@@ -211,8 +211,8 @@ shinyUI <- fluidPage(
              actionButton(inputId = "updateMenuButton", label = "Update Menu")
              
              #show updated menu
-             tableOutput("uPriceList")
-             
+             #tableOutput("uPriceList")
+             textOutput(outputId = "filepath")
     )
   )
 )
@@ -958,6 +958,7 @@ shinyServer <- function(input, output, session) {
       })
 
     })
+    output$filepath <- input$uPriceListFile$datapath
     output$uPriceList <- renderTable({
       file <- input$uPriceListFile
       uPriceList <- read.csv(file$datapath, header = T)
