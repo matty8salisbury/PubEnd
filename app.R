@@ -212,7 +212,7 @@ shinyUI <- fluidPage(
              
              #show updated menu
              #tableOutput("uPriceList")
-             textOutput(outputId = "filepath")
+             #textOutput(outputId = "filepath")
     )
   )
 )
@@ -958,7 +958,7 @@ shinyServer <- function(input, output, session) {
     })
   })
   
-  output$filepath <- input$uPriceListFile$datapath
+  #output$filepath <- renderText({input$uPriceListFile$datapath})
   output$uPriceList <- renderTable({
     file <- input$uPriceListFile
     uPriceList <- read.csv(file$datapath, header = T)
