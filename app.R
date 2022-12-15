@@ -210,6 +210,9 @@ shinyUI <- fluidPage(
              #Submit button
              actionButton(inputId = "updateMenuButton", label = "Update Menu")
              
+             #show updated menu
+             tableOutput("uPriceList")
+             
     )
   )
 )
@@ -955,7 +958,7 @@ shinyServer <- function(input, output, session) {
       })
 
     })
-    values$uPriceList <- renderTable({
+    output$uPriceList <- renderTable({
       file <- input$uPriceListFile
       uPriceList <- read.csv(file$datapath, header = T)
       #validate(need(names(priceList) == c("Item",	"Price",	"Section",	"Description"), "Please upload a csv file in the format request (i.e. set out with headings of: Item, Price, Section, Description)"))
