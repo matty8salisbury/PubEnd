@@ -215,7 +215,7 @@ shinyUI <- fluidPage(
              textOutput(outputId = "filepath"),
              textOutput(outputId = "menuUpdatedConfirmation")
     )
-
+)
 # Wrap your UI with secure_app, enabled admin mode or not
 ui <- secure_app(shinyUI, enable_admin = TRUE)
 
