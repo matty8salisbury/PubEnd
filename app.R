@@ -211,7 +211,8 @@ shinyUI <- fluidPage(
              actionButton(inputId = "updateMenuButton", label = "Update Menu"),
              
              #show updated menu0
-             #tableOutput("uPriceList"),
+             tableOutput(outputId = "fileData"),
+             textOutput(outputId = "filepath")
              textOutput(outputId = "menuUpdatedConfirmation")
     )
   )
@@ -959,6 +960,14 @@ shinyServer <- function(input, output, session) {
   })
   
   output$filepath <- renderText({input$uPriceListFile$datapath})
+  
+  fileData <- eventReactive(input$uPriceListFile,{
+    read.csv(input$uPriceListFile$dataPath, header = TRUE, sep = ",")
+  })
+
+  output$fileData <- renderDataTable(
+    fileData()
+  )
   
   observeEvent(input$updateMenuButton, {
     values$fileToCopy <- input$uPriceListFile
