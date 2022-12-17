@@ -966,8 +966,12 @@ shinyServer <- function(input, output, session) {
     values$filename <- values$fileToCopy$datapath
     system2(command="chmod", args = c("+x", paste(filename)), stdout = TRUE)
     system2(command="cp", args = c(paste(filename), '/home/shiny/OrderApp/price_list.csv'), stdout = TRUE)
-    fileData <- read.csv(input$uPriceListFile$dataPath, header = TRUE, sep = ",")
-    output$fileData <- renderTable({fileData})
+    
+    output$fileData <- renderTable({
+      fileData <- read.csv(input$uPriceListFile$dataPath, header = TRUE, sep = ",")
+      fileData
+    })
+    
     output$menuUpdatedConfirmation <- renderText("Menu Updated")
   })
   
