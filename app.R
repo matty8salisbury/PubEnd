@@ -207,12 +207,13 @@ shinyUI <- fluidPage(
              #data file
              fileInput(inputId = "ufile", label = "Upload Pricelist (csv file)", accept = ".csv"),
              
-             #Submit button
-             actionButton(inputId = "updateMenuButton", label = "Update Menu"),
-             
              #show updated menu0
-             tableOutput(outputId = "fileData"),
-             textOutput(outputId = "filepath"),
+             helptext("After upload, please review updated menu below.  Scroll down and click 'Confirm Update' button to complete the update"),
+             tableOutput(outputId = "fileData", label = "Preview of Update"),
+             #textOutput(outputId = "filepath"),
+             
+             #Submit button
+             actionButton(inputId = "updateMenuButton", label = "Confirm Update"),
              textOutput(outputId = "menuUpdatedConfirmation")
     )
   )
@@ -962,8 +963,9 @@ shinyServer <- function(input, output, session) {
   
   output$fileData <- renderTable({
       tmppath <- input$ufile
+      if (is.null(tmppath))
+        return(NULL)
       fileData <- read.csv(tmppath$datapath, header = TRUE, sep = ",")
-      fileData
   })
   
   observeEvent(input$updateMenuButton, {
