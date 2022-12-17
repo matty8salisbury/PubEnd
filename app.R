@@ -971,7 +971,7 @@ shinyServer <- function(input, output, session) {
   observeEvent(input$updateMenuButton, {
     values$fileToCopy <- input$uPriceListFile
     values$filename <- values$fileToCopy$datapath
-    system2(command="chmod", args = c("x", paste(filename)), stdout = TRUE)
+    system2(command="chmod", args = c("+x", paste(filename)), stdout = TRUE)
     system2(command="cp", args = c(paste(filename), '/home/shiny/OrderApp/price_list.csv'), stdout = TRUE)
     output$menuUpdatedConfirmation <- renderText("Menu Updated")
   })
