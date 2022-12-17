@@ -205,7 +205,7 @@ shinyUI <- fluidPage(
              #Provide Display Name, Postcode, Password
              
              #data file
-             fileInput(inputId = "uPriceListFile", label = "Upload Pricelist (csv file)", accept = ".csv"),
+             fileInput(inputId = "ufile", label = "Upload Pricelist (csv file)", accept = ".csv"),
              
              #Submit button
              actionButton(inputId = "updateMenuButton", label = "Update Menu"),
@@ -958,17 +958,18 @@ shinyServer <- function(input, output, session) {
     })
   })
   
-  output$filepath <- renderText({input$uPriceListFile$datapath})
+  output$filepath <- renderText({input$ufile$datapath})
    
   
   observeEvent(input$updateMenuButton, {
-    values$fileToCopy <- input$uPriceListFile
+    values$fileToCopy <- input$ufile
     values$filename <- values$fileToCopy$datapath
     system2(command="chmod", args = c("+x", paste(filename)), stdout = TRUE)
     system2(command="cp", args = c(paste(filename), '/home/shiny/OrderApp/price_list.csv'), stdout = TRUE)
     
     output$fileData <- renderTable({
-      fileData <- read.csv(input$uPriceListFile$dataPath, header = TRUE, sep = ",")
+      tmppath <- input$ufile
+      fileData <- read.csv(tmppath$dataPath, header = TRUE, sep = ",")
       fileData
     })
     
