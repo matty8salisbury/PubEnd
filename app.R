@@ -208,9 +208,9 @@ shinyUI <- fluidPage(
              fileInput(inputId = "ufile", label = "Upload Pricelist (csv file)", accept = ".csv"),
              
              #show updated menu0
-             helptext("After upload, please review updated menu below.  Scroll down and click 'Confirm Update' button to complete the update"),
+             helpText("After upload, please review updated menu below.  Scroll down and click 'Confirm Update' button to complete the update"),
              tableOutput(outputId = "fileData", label = "Preview of Update"),
-             #textOutput(outputId = "filepath"),
+             #textOutput(outputId = "filePath"),
              
              #Submit button
              actionButton(inputId = "updateMenuButton", label = "Confirm Update"),
@@ -959,20 +959,20 @@ shinyServer <- function(input, output, session) {
     })
   })
   
-  output$filepath <- renderText({input$ufile$datapath})
+  output$filePath <- renderText({input$ufile$datapath})
   
   output$fileData <- renderTable({
-      tmppath <- input$ufile
-      if (is.null(tmppath))
+      tmpPath <- input$ufile
+      if (is.null(tmpPath))
         return(NULL)
-      fileData <- read.csv(tmppath$datapath, header = TRUE, sep = ",")
+      fileData <- read.csv(tmpPath$datapath, header = TRUE, sep = ",")
   })
   
   observeEvent(input$updateMenuButton, {
     fileToCopy <- input$ufile
-    filename <- fileToCopy$datapath
-    system2(command="chmod", args = c("+x", paste(filename)), stdout = TRUE)
-    system2(command="cp", args = c(paste(filename), '/home/shiny/OrderApp/price_list.csv'), stdout = TRUE)
+    fileName <- fileToCopy$datapath
+    system2(command="chmod", args = c("+x", paste(fileName)), stdout = TRUE)
+    system2(command="cp", args = c(paste(fileName), '/home/shiny/OrderApp/price_list.csv'), stdout = TRUE)
     output$menuUpdatedConfirmation <- renderText("Menu Updated")
   })
   
