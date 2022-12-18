@@ -353,17 +353,17 @@ shinyServer <- function(input, output, session) {
       dbDisconnect(cn)
       
       Orders <- data.frame(
-        row_names = "", Item = "", Number = 0, Price = 0, Pub = "", TableNumber = 0, OrderNumber = 0, OrderQrRef = "", OrderStatus = "Closed"
+        Phone = "", Postcode = "", Address ="", Item = "", Number = 0, Price = 0, TableNumber = 0, OrderNumber = 0, OrderQrRef = "", OrderStatus = "Closed"
         , stringsAsFactors = FALSE)
       OrderstblName <- paste0(a, "Orders")
       #create new live orders table
       cn <- conn()
       DBI::dbWriteTable(cn, name = OrderstblName, value = Orders, overwrite = TRUE, field.types = c(
-        row_names = "varchar(50)", Item = "varchar(50)", Number = "double", Price = "double", Pub = "varchar(50)", TableNumber = "double", OrderNumber = "double", OrderQrRef = "varchar(50)", OrderStatus = "varchar(50)"
+        Phone = "varchar(20)", Postcode = "varchar(10)", Address = "varchar(50)", Item = "varchar(50)", Number = "double", Price = "double", TableNumber = "double", OrderNumber = "double", OrderQrRef = "varchar(50)", OrderStatus = "varchar(50)"
       ))
       #create closed (& cancelled) orders table
       DBI::dbWriteTable(cn, name = paste0("Closed",OrderstblName), value = Orders, overwrite = TRUE, field.types = c(
-        row_names = "varchar(50)", Item = "varchar(50)", Number = "double", Price = "double", Pub = "varchar(50)", TableNumber = "double", OrderNumber = "double", OrderQrRef = "varchar(50)", OrderStatus = "varchar(50)"
+        Phone = "varchar(20)", Postcode = "varchar(10)", Address = "varchar(50)", Item = "varchar(50)", Number = "double", Price = "double", TableNumber = "double", OrderNumber = "double", OrderQrRef = "varchar(50)", OrderStatus = "varchar(50)"
       ))
       dbDisconnect(cn)
     }
