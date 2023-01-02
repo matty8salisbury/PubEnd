@@ -971,7 +971,9 @@ shinyServer <- function(input, output, session) {
   })
   
   observeEvent(input$updateMenuButton, {
-    write.csv(x=fileData, file='/home/shiny/OrderApp/price_list.csv')
+    tmpPath2 <- input$ufile
+    fileData2 <- read.csv(tmpPath2$datapath, header = TRUE, sep = ",")
+    write.csv(x=fileData2, file='/home/shiny/OrderApp/price_list.csv')
     output$menuUpdatedConfirmation <- renderText("Menu Updated")
   })
   
