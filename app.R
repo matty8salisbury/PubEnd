@@ -961,23 +961,18 @@ shinyServer <- function(input, output, session) {
   
   output$filePath <- renderText({input$ufile$datapath})
   
+  tmpPath <- input$ufile
+  if (is.null(tmpPath)) {
+    return(NULL)
+  }
+  fileData <- read.csv(tmpPath$datapath, header = TRUE, sep = ",")
+  
   output$fileData <- renderTable({
-      tmpPath <- input$ufile
-      if (is.null(tmpPath)) {
-        return(NULL)
-        }
-      fileData <- read.csv(tmpPath$datapath, header = TRUE, sep = ",")
-      fileData
+    fileData
   })
   
   observeEvent(input$updateMenuButton, {
-    fileToCopy <- input$ufile
-    fileName <- fileToCopy$datapath
-    fileData <- read.csv(fileName, header = TRUE, sep = ",")
     write.csv(x=fileData, file='/home/shiny/OrderApp/price_list.csv')
-    
-    #system2(command="chmod", args = c("+x", fileName), stdout = TRUE)
-    #system2(command="cp", args = c(fileName, '/home/shiny/OrderApp/price_list.csv'), stdout = TRUE)
     output$menuUpdatedConfirmation <- renderText("Menu Updated")
   })
   
