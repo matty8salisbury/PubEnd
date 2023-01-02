@@ -961,13 +961,12 @@ shinyServer <- function(input, output, session) {
   
   output$filePath <- renderText({input$ufile$datapath})
   
-  tmpPath <- input$ufile
-  if (is.null(tmpPath)) {
-    return(NULL)
-  }
-  fileData <- read.csv(tmpPath$datapath, header = TRUE, sep = ",")
-  
   output$fileData <- renderTable({
+    tmpPath <- input$ufile
+    if (is.null(tmpPath)) {
+      return(NULL)
+    }
+    fileData <- read.csv(tmpPath$datapath, header = TRUE, sep = ",")
     fileData
   })
   
